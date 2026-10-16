@@ -3,6 +3,9 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { api } from "./client";
 import type {
   Chunk,
+  EvalBrief,
+  EvalCompare,
+  EvalDetail,
   EvidenceCheckResult,
   ManualResult,
   Meta,
@@ -190,5 +193,36 @@ export function useJudge() {
       qc.invalidateQueries({ queryKey: ["review"] });
       qc.invalidateQueries({ queryKey: ["questions"] });
     },
+  });
+}
+
+// ------------------------------------------------------------------ eval runs
+
+export const useEvals = () =>
+  useQuery({ queryKey: ["evals"], queryFn: () => api.get<{ items: EvalBrief[]; runs_dir: string }>("/evals") });
+
+export const useEval = (name: string | undefined) =>
+  useQuery({ queryKey: ["eval", name], queryFn: () => api.get<EvalDetail>(`/evals/${encodeURIComponent(name!)}`), enabled: !!name });
+
+export const useCompare = (names: string[]) =>
+  useQuery({
+    queryKey: ["evalCompare", names],
+    queryFn: () => api.get<EvalCompare>("/evals/compare", { names: names.join(",") }),
+    enabled: names.length >= 2,
+  });
+
+export function useStartEval() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (b: { chunks: string | null; retriever: string; split: string }) => api.post<{ name: string }>("/evals", b),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["evals"] }),
+  });
+}
+
+export function useDeleteEval() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => api.del<{ deleted: string }>(`/evals/${encodeURIComponent(name)}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["evals"] }),
   });
 }

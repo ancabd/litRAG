@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import Settings
 from .deps import Services
-from .routers import meta, papers, questions, search
+from .routers import evals, meta, papers, questions, search
 
 API_PREFIX = "/api"
 
@@ -26,7 +26,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # the Vite dev server runs on another port during development
     app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
                        allow_methods=["*"], allow_headers=["*"])
-    for r in (meta.router, papers.router, questions.router, search.router):
+    for r in (meta.router, papers.router, questions.router, search.router, evals.router):
         app.include_router(r, prefix=API_PREFIX)
     _mount_ui(app, settings.web_dist)
     return app

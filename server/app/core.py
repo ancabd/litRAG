@@ -15,11 +15,12 @@ from corpus_builder import (  # noqa: E402
 )
 from evaluation.matching import GoldIndex, ngrams, quote_coverage, words  # noqa: E402
 from evaluation.questions import FIELDS, SPLITS, TYPES, Evidence, QuestionFileError, parse_questions  # noqa: E402
+from evaluation.runner import run_eval  # noqa: E402
 from ingest.pipeline import paper_report, rebuild_runs  # noqa: E402
 from retrieval import available as available_retrievers  # noqa: E402
 from retrieval import get_retriever, load_chunks  # noqa: E402
 from retrieval.base import Retriever  # noqa: E402
 
-__all__ = ["Evidence", "MAX_PDF_BYTES", "ManualEditError", "add_manual_pdf", "paper_report", "rebuild_runs",
+__all__ = ["run_eval", "Evidence", "MAX_PDF_BYTES", "ManualEditError", "add_manual_pdf", "paper_report", "rebuild_runs",
            "remove_manual_pdf", "set_manual_abstract", "FIELDS", "SPLITS", "TYPES", "GoldIndex", "QuestionFileError", "Retriever", "available_retrievers",
            "get_retriever", "load_chunks", "ngrams", "parse_questions", "quote_coverage", "words"]

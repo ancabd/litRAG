@@ -22,6 +22,8 @@
   --mark: #fbe38e;
   --mark-ink: #2a2100;
   --focus: #2f4291;
+  --s-strict: #4558b8; /* chart series; validated for lightness band + colorblind separation */
+  --s-lenient: #c2620a;
 
   --sans: "Public Sans Variable", "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --serif: "Source Serif 4 Variable", "Source Serif 4", Georgia, "Times New Roman", serif;
@@ -64,6 +66,8 @@
     --mark-ink: #1a1500;
     --focus: #93a5f2;
     --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.5);
+    --s-strict: #7487dc;
+    --s-lenient: #d07a20;
     color-scheme: dark;
   }
 }
@@ -91,5 +95,7 @@
   --mark-ink: #1a1500;
   --focus: #93a5f2;
   --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --s-strict: #7487dc;
+  --s-lenient: #d07a20;
   color-scheme: dark;
 }

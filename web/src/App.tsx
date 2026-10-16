@@ -8,6 +8,9 @@ import { PapersPage } from "./pages/PapersPage";
 import { QuestionEditor } from "./pages/QuestionEditor";
 import { NoQuestionSelected, QuestionsPage } from "./pages/QuestionsPage";
 import { SearchPage } from "./pages/SearchPage";
+import { ComparePage } from "./pages/ComparePage";
+import { ResultPage } from "./pages/ResultPage";
+import { ResultsPage } from "./pages/ResultsPage";
 import { useRun } from "./run";
 
 function RunPicker() {
@@ -48,6 +51,7 @@ function Shell() {
             Papers <span className="count">{c?.papers ?? ""}</span>
           </NavLink>
           <NavLink to="/search">Search</NavLink>
+          <NavLink to="/results">Results</NavLink>
         </nav>
         <div className="sidebar-foot">
           <RunPicker />
@@ -87,6 +91,9 @@ const router = createBrowserRouter([
       { path: "papers", element: <PapersPage /> },
       { path: "papers/:id", element: <PaperPage /> },
       { path: "search", element: <SearchPage /> },
+      { path: "results", element: <ResultsPage /> },
+      { path: "results/compare", element: <ComparePage /> },
+      { path: "results/:name", element: <ResultPage /> },
       { path: "*", element: <Navigate to="/questions" replace /> },
     ],
   },

@@ -34,6 +34,7 @@ python -m app            # http://127.0.0.1:8000   (API docs: /api/docs)
 - **Papers**: every paper in the corpus with its OpenAlex id, full-text status, why it's in the corpus (seed, cited by a seed, or citing one), its abstract, its chunks, a link to the PDF, and the questions that use it as evidence.
 - **Adding what's missing**: for abstract-only and metadata-only papers, add a PDF you have (drop it on the paper's page or its row in the list), or paste an abstract. The app saves the PDF to `corpus/pdfs/`, updates `manifest.jsonl` and `manifest.csv`, records the addition in `corpus/manual.jsonl` (so `corpus_builder.py` keeps it on later runs), and re-chunks every chunk run. The paper is searchable and usable as evidence straight away, and the page tells you if the PDF couldn't be parsed (e.g. a scanned PDF), in which case the abstract is used. A PDF you added can be removed again.
 - **Search**: BM25 over all chunks.
+- **Results**: every eval run, whether started here with **Run eval** or from the terminal with `evaluate.py run` (same code, same `corpus-builder/runs/` folder). A run's page shows strict and lenient scores with 95% intervals, the breakdown by type and tag, and each question's top 10 labeled as your evidence, alternative, not relevant or not reviewed, with links to the question and papers. Select runs to compare them, including which questions moved.
 
 The chunk run (e.g. `pymupdf_w400_o60`) is picked in the sidebar; evidence checks, search and chunk counts all use it.
 

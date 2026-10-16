@@ -170,3 +170,72 @@ export interface ReviewResult {
   judged: number;
   evidence: { paper: string; title: string | null }[];
 }
+
+// ------------------------------------------------------------------ eval runs (Results tab)
+
+export interface Interval {
+  mean: number;
+  lo: number;
+  hi: number;
+  n: number;
+}
+
+export interface EvalBrief {
+  name: string;
+  created: string | null;
+  retriever: Record<string, unknown> & { name: string };
+  chunks: string | null;
+  parser: string | null;
+  split: string | null;
+  n_scored: number;
+  n_questions: number;
+  questions_sha1: string;
+  git_commit: string | null;
+  headline: Record<string, { strict: number | null; lenient: number | null }>;
+  judged: number | null;
+}
+
+export interface EvalHit {
+  chunk_id: string;
+  rank: number;
+  score: number;
+  label: { kind: JudgmentKind; item: number | null };
+  paper_id?: string;
+  title?: string | null;
+  year?: number | null;
+  section?: string;
+  page_start?: number | null;
+  page_end?: number | null;
+  source?: string;
+  text?: string;
+  n_words?: number;
+}
+
+export interface EvalQuestion {
+  id: string;
+  question: string;
+  type: string;
+  tags: string[];
+  strict_rank: number | null;
+  lenient_rank: number | null;
+  metrics: Record<string, number>;
+  retrieved: EvalHit[];
+}
+
+export interface EvalDetail extends EvalBrief {
+  summary: {
+    results: Record<string, Record<string, Interval>>;
+    excluded: { id: string; reason: string }[];
+    timing: { index_seconds: number; mean_query_ms: number; total_seconds: number };
+    ks: number[];
+  };
+  questions: EvalQuestion[];
+  report: string | null;
+  chunks_available: boolean;
+}
+
+export interface EvalCompare {
+  runs: (EvalBrief & { results: Record<string, Interval> })[];
+  same_questions: boolean;
+  questions: { id: string; question: string; per_run: ({ strict_rank: number | null; lenient_rank: number | null } | null)[] }[];
+}

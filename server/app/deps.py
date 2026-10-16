@@ -8,6 +8,7 @@ from fastapi import HTTPException, Request
 from .config import Settings
 from .services.chunks import ChunkService, RunData
 from .services.corpus import CorpusService, ManualEditor
+from .services.evalruns import EvalRunService
 from .services.questions import QuestionStore
 
 
@@ -18,12 +19,14 @@ class Services:
     chunks: ChunkService
     questions: QuestionStore
     manual: ManualEditor
+    evals: EvalRunService
 
     @classmethod
     def build(cls, settings: Settings) -> "Services":
         chunks = ChunkService(settings.chunks_root)
         return cls(settings, CorpusService(settings.corpus_dir), chunks, QuestionStore(settings.questions_file),
-                   ManualEditor(settings.corpus_dir, settings.chunks_root, chunks))
+                   ManualEditor(settings.corpus_dir, settings.chunks_root, chunks),
+                   EvalRunService(settings.runs_dir, settings.chunks_root, settings.questions_file))
 
 
 def services(request: Request) -> Services:

@@ -63,7 +63,7 @@ Unanswerable questions are skipped here; they're scored later, in the answer eva
 
 ## Runs
 
-Each run writes a folder under `runs/`:
+Runs can be started from the terminal (`python evaluate.py run`) or from the app's **Results** tab (**Run eval**); both use the same code and write to the same place, and the Results tab lists, shows and compares all of them. Each run writes a folder under `runs/`:
 
 - `report.md`: overall metrics, breakdown, and every miss with what was retrieved instead (start reading here)
 - `summary.json`: all numbers plus the full configuration: retriever settings, chunk config, parser version, question file hash, git commit

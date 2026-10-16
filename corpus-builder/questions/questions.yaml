@@ -37,76 +37,159 @@
 #
 # Aim for: ~40% lookup, ~30% multihop/comparison, ~15% unanswerable, 5-10 tagged equation.
 # Write ~20 dev questions first; hold back ~40 more as test once the pipeline is stable.
-#
-# The examples below have placeholder paper ids and quotes. `evaluate.py check` will
-# flag them until you replace both with real ones from your corpus.
 
-- id: q001
-  question: What test system did Behler and Parrinello use to demonstrate their neural network potential?
+
+- id: q011
+  question: How does SchNet turn an interatomic distance into the input of its filter network?
   type: lookup
-  tags: [behler-parrinello]
+  tags: [equation, schnet]
   split: dev
-  answer: Bulk silicon; the network potential was compared against DFT reference calculations.
+  answer: >-
+    It expands the distance in a basis of Gaussians, e_k = exp(-gamma (|r_j - r_i| - mu_k)^2), with centers mu_k
+    on a uniform grid from zero to the distance cutoff. Grid spacing and gamma are both set to 0.1 Angstrom.
+    The expansion decorrelates the filter values, which improves the conditioning of the optimization.
   evidence:
-    - paper: W_BEHLER_PARRINELLO_2007     # TODO: OpenAlex id from manifest.csv
-      quote: "TODO copy the sentence that names the test system"
+    - paper: W2778051509
+      quote: "with centers μk chosen on a uniform grid between zero and the distance cutoff. This has the effect of decorrelating the filter values which improves the conditioning of the optimization problem."
 
-- id: q002
-  question: What is the functional form of the cutoff function in the original high-dimensional neural network potential?
+- id: q012
+  question: Which activation function does SchNet use, and why does that matter for force fields?
   type: lookup
-  tags: [equation, behler-parrinello]
+  tags: [equation, schnet]
   split: dev
-  answer: "A cosine cutoff: f_c(R) = 0.5 [cos(pi R / R_c) + 1] for R <= R_c, and 0 beyond the cutoff radius R_c."
+  answer: >-
+    A shifted softplus, ssp(x) = ln(0.5 e^x + 0.5). The shift makes ssp(0) = 0 and improves convergence, and
+    because it is infinitely differentiable the learned energy surface is smooth, giving smooth forces and the
+    second derivatives needed for training on forces and for vibrational modes.
   evidence:
-    - paper: W_BEHLER_PARRINELLO_2007
-      quote: "TODO the sentence introducing the cutoff function (not the formula itself)"
+    - paper: W2778051509
+      quote: "The shifting ensures that ssp(0) = 0 and improves the convergence of the network while having infinite order of continuity."
 
-- id: q003
-  question: How are the total energy and the atomic contributions related in a high-dimensional neural network potential?
+- id: q013
+  question: Why can't SchNet use ordinary convolutional layers like image models do?
   type: lookup
-  tags: [equation, definition, behler-parrinello]
+  tags: [definition, schnet]
   split: dev
-  answer: The total energy is a sum of atomic energies, each predicted by an atomic neural network from that atom's local environment within a cutoff.
+  answer: >-
+    Atoms sit at arbitrary positions rather than on a regular grid like pixels, so a fixed filter tensor can't be
+    used. SchNet uses continuous-filter convolutions, where a filter-generating network computes the filter
+    values from the atoms' relative positions.
   evidence:
-    - paper: W_BEHLER_PARRINELLO_2007
-      quote: "TODO"
+    - paper: W2778051509
+      quote: "This generalization is necessary since atoms are not located on a regular grid like image pixels, but can be located at arbitrary positions."
 
-- id: q004
-  question: Under which symmetry group are NequIP's internal features equivariant, and how are they built?
+- id: q014
+  question: What cutoff radius did SchNet use when learning formation energies of bulk crystals?
   type: lookup
-  tags: [definition, nequip]
+  tags: [numeric, schnet]
   split: dev
-  answer: E(3); features are geometric tensors indexed by irreducible representations of O(3), combined by tensor products with spherical harmonics of relative position vectors.
+  answer: >-
+    5 Angstrom, on the Materials Project data. Two structures that would contain isolated atoms at that cutoff
+    were dropped. (For the small QM9 and MD17 molecules no cutoff was used.)
   evidence:
-    - paper: W_NEQUIP_2022
-      quote: "TODO"
+    - paper: W2778051509
+      quote: "We set the distance cutoff rcut = 5Å and discard two examples from the data set that would include isolated atoms with this setting."
 
-- id: q005
-  question: How does NequIP's handling of rotational symmetry differ from the Behler-Parrinello symmetry functions?
+- id: q015
+  question: How does SchNet make sure its predicted forces conserve energy?
+  type: lookup
+  tags: [equation, schnet]
+  split: dev
+  answer: >-
+    Forces are not predicted directly: they are the negative gradient of the predicted energy with respect to
+    the atomic positions, F_i = -dE/dr_i. With a rotationally invariant energy model this gives rotationally
+    equivariant forces and an energy-conserving force field.
+  evidence:
+    - paper: W2778051509
+      quote: "When using a rotationally invariant energy model, this ensures rotationally equivariant force predictions and guarantees an energy conserving force field"
+
+- id: q016
+  question: SchNet and NequIP both use continuous convolutions over neighboring atoms. What do their filters see about the neighbors, and how does that change the features they can build?
   type: comparison
-  tags: [behler-parrinello, nequip]
+  tags: [schnet, nequip]
   split: dev
-  answer: Behler-Parrinello uses fixed, hand-designed invariant descriptors (scalars) of the environment; NequIP learns equivariant features that carry vector/tensor information through message passing, and only the final energy is invariant.
+  answer: >-
+    SchNet's filters only see interatomic distances (expanded in Gaussians), so they are rotationally invariant
+    and the features stay scalars. NequIP's filters also use the direction to the neighbor, so its internal
+    features are geometric tensors that are equivariant to rotation; restricted to scalars it reduces to a
+    SchNet-style invariant network.
   evidence:
-    - paper: W_BEHLER_PARRINELLO_2007
-      quote: "TODO a passage describing the symmetry functions as invariant descriptors"
-    - paper: W_NEQUIP_2022
-      quote: "TODO a passage contrasting equivariant with invariant features"
+    - paper: W2778051509
+      quote: "It is straightforward to include rotational invariance by computing pairwise distances instead of using relative positions."
+    - paper: W4225405705
+      quote: "making the network a conventional invariant GNN-IP, involving only invariant convolutions over scalar features in a SchNet-style fashion"
 
-- id: q006
-  question: Why have polarizable force fields been developed, according to the force-field review, and what limitation of additive force fields do they address?
+- id: q017
+  question: Which kernel method did the SchNet paper compare against on MD17, and how does NequIP do against kernel methods of that kind?
+  type: multihop
+  tags: [schnet, nequip]
+  split: dev
+  answer: >-
+    SchNet compared against GDML (gradient-domain machine learning), which was more data-efficient on the small
+    training set for most molecules. The NequIP paper reports outperforming kernel-based approaches, including
+    sGDML (the symmetrized successor of GDML), as well as GAP and FCHL19.
+  evidence:
+    - paper: W2778051509
+      quote: "We also list the performances of gradient domain machine learning (GDML)21 and DTNN28 for reference."
+    - paper: W4225405705
+      quote: "We find that NequIP significantly outperforms invariant GNN-IPs (such as SchNet [9] and DimeNet [11]), shallow neural networks (such as ANI [40]), and kernel-based approaches"
+  notes: Multi-hop on purpose. The second search depends on knowing the first answer (GDML).
+
+- id: q018
+  question: Both SchNet and the Behler-Parrinello potential build the prediction from atomic contributions. For which properties does the SchNet paper say this is a poor fit?
+  type: comparison
+  tags: [schnet, behler-parrinello]
+  split: dev
+  answer: >-
+    Behler-Parrinello writes the total energy as a sum of atomic energies. SchNet does the same for its targets
+    and does noticeably worse on the polarizability and the electronic spatial extent <R^2> of QM9 molecules,
+    which the authors attribute to that atom-wise decomposition not suiting these properties.
+  evidence:
+    - paper: W2025444507
+      quote: "The main idea is to represent the total energy E of the system as a sum of atomic contributions Ei, an approach that is typically also used in empirical potentials"
+    - paper: W2778051509
+      quote: "This is most likely due to the decomposition of the energy into atomic contributions which is not appropriate for these properties."
+
+- id: q019
+  question: What problem with CHARMM36 was CHARMM36m designed to fix?
   type: lookup
-  tags: [force-fields]
+  tags: [force-fields, charmm]
   split: dev
-  answer: Fixed-charge (additive) force fields cannot respond to their electrostatic environment; polarizable models let the charge distribution change with the environment.
+  answer: >-
+    CHARMM36 overstabilized compact and left-handed helical structures in intrinsically disordered proteins
+    and peptides. CHARMM36m was refined to describe disordered proteins better while keeping the accuracy of
+    CHARMM36 for folded proteins.
   evidence:
-    - paper: W_FORCE_FIELD_REVIEW
-      quote: "TODO"
+    - paper: W_CHARMM36M_TODO
+  notes: "TODO: answer written from memory; check it against the paper. Find the id with: grep -i charmm36m corpus/manifest.csv, then add a quote."
 
-- id: q007
-  question: What experimental hit rate did RFdiffusion achieve for de novo protein binder design?
+- id: q020
+  question: Which parts of the force field were changed to go from CHARMM36 to CHARMM36m?
+  type: lookup
+  tags: [force-fields, charmm]
+  split: dev
+  answer: >-
+    Mainly the backbone CMAP correction was refit, to reduce the left-handed helix bias, and the paper recommends
+    a modified TIP3P water with a stronger Lennard-Jones interaction on the water hydrogens, so that disordered
+    proteins are less overly compact.
+  evidence:
+    - paper: W_CHARMM36M_TODO
+  notes: "TODO: answer written from memory, and the least certain of these. Check it, and correct the answer if the paper says otherwise."
+
+- id: q021
+  question: What experimental success rate does RFdiffusion reach when designing protein binders?
   type: unanswerable
   tags: [out-of-scope]
   split: dev
-  answer: Not answerable from this corpus (protein design papers are not included).
-  notes: Checks that the system declines instead of guessing from ML-potential papers.
+  answer: Not answerable from this corpus, which covers interatomic potentials and force fields, not protein design.
+  notes: Off-topic for the corpus; checks that the system says so instead of guessing.
+
+- id: q022
+  question: What dropout rate was used when training SchNet?
+  type: unanswerable
+  tags: [schnet]
+  split: dev
+  answer: Not in the corpus. The SchNet paper describes its optimizer, batch size and learning-rate decay, but no dropout.
+  notes: >-
+    A near-miss on purpose: the training section looks like it should contain this, so a weak system may invent
+    a number. Review the retrieved passages once; if a corpus paper does report SchNet dropout, change the type.
