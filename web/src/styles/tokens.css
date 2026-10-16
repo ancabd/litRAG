@@ -1,0 +1,95 @@
+/* Design tokens. A quiet, cool workbench; the one loud colour is the highlighter
+   used for evidence matches (--mark). */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --surface-2: #f8f9fb;
+  --ink: #17202c;
+  --ink-2: #4b5666;
+  --ink-3: #737d8c;
+  --rule: #dde2e8;
+  --rule-strong: #c5ccd5;
+  --accent: #2f4291;
+  --accent-hover: #26367a;
+  --accent-ink: #ffffff;
+  --accent-soft: #e6eaf7;
+  --ok: #1d7a5f;
+  --ok-soft: #e1f1ea;
+  --warn: #a14e0b;
+  --warn-soft: #fbeedd;
+  --danger: #b42318;
+  --danger-soft: #fde8e6;
+  --mark: #fbe38e;
+  --mark-ink: #2a2100;
+  --focus: #2f4291;
+
+  --sans: "Public Sans Variable", "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --serif: "Source Serif 4 Variable", "Source Serif 4", Georgia, "Times New Roman", serif;
+
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 26px;
+
+  --r-sm: 4px;
+  --r-md: 7px;
+  --r-lg: 10px;
+  --shadow-pop: 0 6px 24px rgba(23, 32, 44, 0.14), 0 1px 3px rgba(23, 32, 44, 0.08);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161d;
+    --surface: #191e27;
+    --surface-2: #1f2530;
+    --ink: #e7ebf0;
+    --ink-2: #aab3c0;
+    --ink-3: #828c9b;
+    --rule: #2a313c;
+    --rule-strong: #3b4451;
+    --accent: #93a5f2;
+    --accent-hover: #aebcf6;
+    --accent-ink: #0f1530;
+    --accent-soft: #252d4a;
+    --ok: #5fcba4;
+    --ok-soft: #173029;
+    --warn: #f0a65a;
+    --warn-soft: #35271a;
+    --danger: #f2877e;
+    --danger-soft: #3a1f1d;
+    --mark: #e9cc5c;
+    --mark-ink: #1a1500;
+    --focus: #93a5f2;
+    --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #12161d;
+  --surface: #191e27;
+  --surface-2: #1f2530;
+  --ink: #e7ebf0;
+  --ink-2: #aab3c0;
+  --ink-3: #828c9b;
+  --rule: #2a313c;
+  --rule-strong: #3b4451;
+  --accent: #93a5f2;
+  --accent-hover: #aebcf6;
+  --accent-ink: #0f1530;
+  --accent-soft: #252d4a;
+  --ok: #5fcba4;
+  --ok-soft: #173029;
+  --warn: #f0a65a;
+  --warn-soft: #35271a;
+  --danger: #f2877e;
+  --danger-soft: #3a1f1d;
+  --mark: #e9cc5c;
+  --mark-ink: #1a1500;
+  --focus: #93a5f2;
+  --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}

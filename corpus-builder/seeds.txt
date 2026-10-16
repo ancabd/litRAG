@@ -1,0 +1,11 @@
+# One paper per line: a DOI, arxiv:<id>, an OpenAlex id (W...), or the exact title.
+# DOIs are the most reliable. Lines starting with # are ignored.
+
+# Behler & Parrinello (2007), PRL: Generalized neural-network representation of high-dimensional PES
+10.1103/PhysRevLett.98.146401
+
+# Batzner et al. (2022), Nature Communications: NequIP
+10.1038/s41467-022-29939-5
+
+# Review: matched by title. Check the match printed in the log, and replace with its DOI once confirmed.
+The continuous evolution of biomolecular force fields

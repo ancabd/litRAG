@@ -1,0 +1,112 @@
+# Retrieval eval questions.
+#
+# Fields
+#   id        unique, never reuse or renumber (results are tracked per id)
+#   question  phrase it the way you'd actually ask it, NOT copied from the paper's wording:
+#             copying the paper makes keyword search look better than it is
+#   type      lookup        one fact from one passage
+#             multihop      needs two passages, where the second depends on the first
+#             comparison    needs two passages, compared side by side
+#             unanswerable  the answer is not in the corpus (tests that the system says so)
+#   tags      free-form; results are broken down per tag. Suggested:
+#               equation    the answer IS a formula (tracks parser damage to math)
+#               numeric     the answer is a number/value (cutoff radius, error, dataset size)
+#               definition  "what is X"
+#               plus one tag per seed/topic, e.g. behler-parrinello, nequip, force-fields
+#   split     dev (tune on these, look at them freely) or test (only run at the very end)
+#   answer    your reference answer, in your own words; used later by the answer eval
+#   evidence  where the answer is: the paper's OpenAlex id + a short quote from it
+#             - find ids:     grep -i "nequip" corpus/manifest.csv
+#             - find quotes:  python evaluate.py search "your keywords"   (copy 10-30 words)
+#             - verify:       python evaluate.py check
+#             Quotes from equations rarely match (the parser garbles math): quote the
+#             sentence just before or after the equation instead.
+#   notes     optional, for yourself
+#
+# Judgments (easiest to add in the app: "Review retrieved passages" on a question):
+#   evidence[i].alternatives   other passages that answer that part too, e.g. a later paper
+#                              restating the original result. Strict scoring ignores them;
+#                              lenient scoring accepts them.
+#                                evidence:
+#                                  - paper: W...
+#                                    quote: "..."
+#                                    alternatives:
+#                                      - {paper: W..., quote: "..."}
+#   not_relevant               passages you reviewed that don't answer the question
+#                              (list of {paper, quote}); they're never shown for review again
+#
+# Aim for: ~40% lookup, ~30% multihop/comparison, ~15% unanswerable, 5-10 tagged equation.
+# Write ~20 dev questions first; hold back ~40 more as test once the pipeline is stable.
+#
+# The examples below have placeholder paper ids and quotes. `evaluate.py check` will
+# flag them until you replace both with real ones from your corpus.
+
+- id: q001
+  question: What test system did Behler and Parrinello use to demonstrate their neural network potential?
+  type: lookup
+  tags: [behler-parrinello]
+  split: dev
+  answer: Bulk silicon; the network potential was compared against DFT reference calculations.
+  evidence:
+    - paper: W_BEHLER_PARRINELLO_2007     # TODO: OpenAlex id from manifest.csv
+      quote: "TODO copy the sentence that names the test system"
+
+- id: q002
+  question: What is the functional form of the cutoff function in the original high-dimensional neural network potential?
+  type: lookup
+  tags: [equation, behler-parrinello]
+  split: dev
+  answer: "A cosine cutoff: f_c(R) = 0.5 [cos(pi R / R_c) + 1] for R <= R_c, and 0 beyond the cutoff radius R_c."
+  evidence:
+    - paper: W_BEHLER_PARRINELLO_2007
+      quote: "TODO the sentence introducing the cutoff function (not the formula itself)"
+
+- id: q003
+  question: How are the total energy and the atomic contributions related in a high-dimensional neural network potential?
+  type: lookup
+  tags: [equation, definition, behler-parrinello]
+  split: dev
+  answer: The total energy is a sum of atomic energies, each predicted by an atomic neural network from that atom's local environment within a cutoff.
+  evidence:
+    - paper: W_BEHLER_PARRINELLO_2007
+      quote: "TODO"
+
+- id: q004
+  question: Under which symmetry group are NequIP's internal features equivariant, and how are they built?
+  type: lookup
+  tags: [definition, nequip]
+  split: dev
+  answer: E(3); features are geometric tensors indexed by irreducible representations of O(3), combined by tensor products with spherical harmonics of relative position vectors.
+  evidence:
+    - paper: W_NEQUIP_2022
+      quote: "TODO"
+
+- id: q005
+  question: How does NequIP's handling of rotational symmetry differ from the Behler-Parrinello symmetry functions?
+  type: comparison
+  tags: [behler-parrinello, nequip]
+  split: dev
+  answer: Behler-Parrinello uses fixed, hand-designed invariant descriptors (scalars) of the environment; NequIP learns equivariant features that carry vector/tensor information through message passing, and only the final energy is invariant.
+  evidence:
+    - paper: W_BEHLER_PARRINELLO_2007
+      quote: "TODO a passage describing the symmetry functions as invariant descriptors"
+    - paper: W_NEQUIP_2022
+      quote: "TODO a passage contrasting equivariant with invariant features"
+
+- id: q006
+  question: Why have polarizable force fields been developed, according to the force-field review, and what limitation of additive force fields do they address?
+  type: lookup
+  tags: [force-fields]
+  split: dev
+  answer: Fixed-charge (additive) force fields cannot respond to their electrostatic environment; polarizable models let the charge distribution change with the environment.
+  evidence:
+    - paper: W_FORCE_FIELD_REVIEW
+      quote: "TODO"
+
+- id: q007
+  question: What experimental hit rate did RFdiffusion achieve for de novo protein binder design?
+  type: unanswerable
+  tags: [out-of-scope]
+  split: dev
+  answer: Not answerable from this corpus (protein design papers are not included).
+  notes: Checks that the system declines instead of guessing from ML-potential papers.
