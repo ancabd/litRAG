@@ -37,149 +37,317 @@
 #
 # Aim for: ~40% lookup, ~30% multihop/comparison, ~15% unanswerable, 5-10 tagged equation.
 # Write ~20 dev questions first; hold back ~40 more as test once the pipeline is stable.
+#
+# The examples below have placeholder paper ids and quotes. `evaluate.py check` will
+# flag them until you replace both with real ones from your corpus.
 
+- id: q001
+  question: What test system did Behler and Parrinello use to demonstrate their neural network potential?
+  type: lookup
+  tags:
+  - behler-parrinello
+  split: dev
+  answer: Bulk silicon; the network potential was compared against DFT reference calculations.
+  evidence:
+  - paper: W2025444507
+    quote: The high accuracy of the method is demonstrated for bulk silicon and compared with empirical potentials
+      and DFT
+
+- id: q002
+  question: What is the functional form of the cutoff function in the original high-dimensional neural network potential?
+  type: lookup
+  tags:
+  - equation
+  - behler-parrinello
+  split: dev
+  answer: 'A cosine cutoff: f_c(R) = 0.5 [cos(pi R / R_c) + 1] for R <= R_c, and 0 beyond the cutoff radius R_c.'
+  evidence:
+  - paper: W2025444507
+    quote: 'In order to define the energetically relevant local environment we employ a cutoff function fc of the
+      interatomic distance Rij, which has the form fcRij 8< : 0:5 h cos Rij Rc 1 i for Rij Rc; 0 for Rij > Rc:'
+
+- id: q003
+  question: How are the total energy and the atomic contributions related in a high-dimensional neural network potential?
+  type: lookup
+  tags:
+  - equation
+  - definition
+  - behler-parrinello
+  split: dev
+  answer: The total energy is a sum of atomic energies, each predicted by an atomic neural network from that atom's
+    local environment within a cutoff.
+  evidence:
+  - paper: W2025444507
+    quote: 'The main idea is to represent the total energy E of the system as a sum of atomic contributions Ei,
+      an approach that is typically also used in empirical potentials E X i Ei:'
+
+- id: q004
+  question: Under which symmetry group are NequIP's internal features equivariant, and how are they built?
+  type: lookup
+  tags:
+  - definition
+  - nequip
+  split: dev
+  answer: E(3); features are geometric tensors indexed by irreducible representations of O(3), combined by tensor
+    products with spherical harmonics of relative position vectors.
+  evidence:
+  - paper: W4225405705
+    quote: This work presents Neural Equivariant Interatomic Potentials (NequIP), an E(3)-equivariant neural network
+      approach for learning interatomic potentials from ab-initio calculations for molecular dynamics simulations.
+    alternatives:
+    - paper: W4225405705
+      quote: where DX[g] and DY [g] are the representations of the group element g in the vector spaces X and Y
+        , respectively. Here, we focus on equivariance with
+
+- id: q005
+  question: How does NequIP's handling of rotational symmetry differ from the Behler-Parrinello symmetry functions?
+  type: comparison
+  tags:
+  - behler-parrinello
+  - nequip
+  split: dev
+  answer: Behler-Parrinello uses fixed, hand-designed invariant descriptors (scalars) of the environment; NequIP
+    learns equivariant features that carry vector/tensor information through message passing, and only the final
+    energy is invariant.
+  evidence:
+  - paper: W2025444507
+    quote: Furthermore, the symmetry function values must be invariant
+    alternatives:
+    - paper: W2988055229
+      quote: (Fig. 3b). This second step, combined with parameter sharing, achieves permutation invariance, as explained
+        in Sec. 3.4.2. Transferability is achieved due to parameter sharing, but also because the
+  - paper: W4225405705
+    quote: ven though the output of NequIP is the predicted potential energy Epot, which is invariant under translations,
+      reflection, and rotations, the network contains internal features that are geometric tensors which are equivariant
+      to rotation and reflection. This constitutes the core difference between NequIP and existing scalar-valued
+      invariant GNN-IPs.
+
+- id: q007
+  question: What features does the Nequip architecture use, that are also used by schnet?
+  type: comparison
+  tags:
+  - nequip
+  split: dev
+  evidence:
+  - paper: W4225405705
+    quote: 'The NequIP network architecture, shown in Figure 2, is built on an atomic embedding, followed by a series
+      of interaction blocks, and finally an output block: • Embedding: following SchNet, the initial feature is
+      generated using a trainable embedding that operates on the atomic number'
+  - paper: W4225405705
+    quote: making the network a conventional invariant GNN-IP, involving only invariant convolutions over scalar
+      features in a SchNet-style fashion
+
+- id: q008
+  question: What does Nequip do as a first step in the architecture?
+  type: lookup
+  tags:
+  - nequip
+  split: dev
+  evidence:
+  - paper: W4225405705
+    quote: 'Embedding: following SchNet, the initial feature is generated using a trainable embedding that operates
+      on the atomic number Zi (represented via a one-hot encoding) alone, implemented via a trainable self-interaction
+      layer.'
+
+- id: q009
+  question: What datasets is Nequip tested on?
+  type: lookup
+  split: dev
+  evidence:
+  - paper: W4225405705
+    quote: 'We validate the proposed method on a diverse series of challenging data sets: first we demonstrate that
+      we improve upon state-of-the-art accuracy on MD-17, a data set of small, organic molecules that is widely
+      used for benchmarking ML-IPs [9, 11, 35–37]. Next, we show that NequIP can accurately learn forces obtained
+      on small molecules at the quantum chemical CCSD(T) level of theory [37]. To broaden the applicability of the
+      method beyond small isolated molecules, we finally explore a series of extended systems with periodic boundary
+      conditions, consisting of both surfaces and bulk materials: water in different phases [15, 38], a chemical
+      reaction at a solid/gas interface, an amorphous Lithium Phosphate [12], and a Lithium superionic conductor
+      [13]. Details of the training procedure are provided in the Methods section. MD-17 small molecule dynamics
+      We first evaluate NequIP on MD-17 [35–37], a data set of small organic molecules in which reference values
+      of energy and forces are generated by ab-initio MD simulations with DFT. Recently, a recomputed version of
+      the original MD-17 data with higher numerical accuracy has been released, termed the revised MD-17 data set
+      [39] (an example histogram of potential energies and force components can be found in Appendix C). In order
+      to be able to compare results to a wide variety of methods, we benchmark NequIP on both data sets.'
+
+- id: q010
+  question: Which other models is Nequip compared to in the original Nequip paper on MD-17?
+  type: lookup
+  split: dev
+  evidence:
+  - paper: W4225405705
+    quote: We find that NequIP significantly outperforms invariant GNN-IPs (such as SchNet [9] and DimeNet [11]),
+      shallow neural networks (such as ANI [40]), and kernel-based approaches (such as GAP [5], FCHL19/GPR [39,
+      41] and sGDML [37]). Finally, we compare to a series of other methods including ACE [42], SpookyNet [25],
+      and GemNet [24] as well as other equivariant neural networks such as PaiNN [22], NewtonNet [23], and UNiTE
+      [26].
 
 - id: q011
   question: How does SchNet turn an interatomic distance into the input of its filter network?
   type: lookup
-  tags: [equation, schnet]
+  tags:
+  - equation
+  - schnet
   split: dev
-  answer: >-
-    It expands the distance in a basis of Gaussians, e_k = exp(-gamma (|r_j - r_i| - mu_k)^2), with centers mu_k
-    on a uniform grid from zero to the distance cutoff. Grid spacing and gamma are both set to 0.1 Angstrom.
+  answer: It expands the distance in a basis of Gaussians, e_k = exp(-gamma (|r_j - r_i| - mu_k)^2), with centers
+    mu_k on a uniform grid from zero to the distance cutoff. Grid spacing and gamma are both set to 0.1 Angstrom.
     The expansion decorrelates the filter values, which improves the conditioning of the optimization.
   evidence:
-    - paper: W2778051509
-      quote: "with centers μk chosen on a uniform grid between zero and the distance cutoff. This has the effect of decorrelating the filter values which improves the conditioning of the optimization problem."
+  - paper: W2778051509
+    quote: with centers μk chosen on a uniform grid between zero and the distance cutoff. This has the effect of
+      decorrelating the filter values which improves the conditioning of the optimization problem.
 
 - id: q012
   question: Which activation function does SchNet use, and why does that matter for force fields?
   type: lookup
-  tags: [equation, schnet]
+  tags:
+  - equation
+  - schnet
   split: dev
-  answer: >-
-    A shifted softplus, ssp(x) = ln(0.5 e^x + 0.5). The shift makes ssp(0) = 0 and improves convergence, and
-    because it is infinitely differentiable the learned energy surface is smooth, giving smooth forces and the
-    second derivatives needed for training on forces and for vibrational modes.
+  answer: A shifted softplus, ssp(x) = ln(0.5 e^x + 0.5). The shift makes ssp(0) = 0 and improves convergence, and
+    because it is infinitely differentiable the learned energy surface is smooth, giving smooth forces and the second
+    derivatives needed for training on forces and for vibrational modes.
   evidence:
-    - paper: W2778051509
-      quote: "The shifting ensures that ssp(0) = 0 and improves the convergence of the network while having infinite order of continuity."
+  - paper: W2778051509
+    quote: The shifting ensures that ssp(0) = 0 and improves the convergence of the network while having infinite
+      order of continuity.
 
 - id: q013
   question: Why can't SchNet use ordinary convolutional layers like image models do?
   type: lookup
-  tags: [definition, schnet]
+  tags:
+  - definition
+  - schnet
   split: dev
-  answer: >-
-    Atoms sit at arbitrary positions rather than on a regular grid like pixels, so a fixed filter tensor can't be
-    used. SchNet uses continuous-filter convolutions, where a filter-generating network computes the filter
-    values from the atoms' relative positions.
+  answer: Atoms sit at arbitrary positions rather than on a regular grid like pixels, so a fixed filter tensor can't
+    be used. SchNet uses continuous-filter convolutions, where a filter-generating network computes the filter values
+    from the atoms' relative positions.
   evidence:
-    - paper: W2778051509
-      quote: "This generalization is necessary since atoms are not located on a regular grid like image pixels, but can be located at arbitrary positions."
+  - paper: W2778051509
+    quote: This generalization is necessary since atoms are not located on a regular grid like image pixels, but
+      can be located at arbitrary positions.
 
 - id: q014
   question: What cutoff radius did SchNet use when learning formation energies of bulk crystals?
   type: lookup
-  tags: [numeric, schnet]
+  tags:
+  - numeric
+  - schnet
   split: dev
-  answer: >-
-    5 Angstrom, on the Materials Project data. Two structures that would contain isolated atoms at that cutoff
+  answer: 5 Angstrom, on the Materials Project data. Two structures that would contain isolated atoms at that cutoff
     were dropped. (For the small QM9 and MD17 molecules no cutoff was used.)
   evidence:
-    - paper: W2778051509
-      quote: "We set the distance cutoff rcut = 5Å and discard two examples from the data set that would include isolated atoms with this setting."
+  - paper: W2778051509
+    quote: We set the distance cutoff rcut = 5Å and discard two examples from the data set that would include isolated
+      atoms with this setting.
 
 - id: q015
   question: How does SchNet make sure its predicted forces conserve energy?
   type: lookup
-  tags: [equation, schnet]
+  tags:
+  - equation
+  - schnet
   split: dev
-  answer: >-
-    Forces are not predicted directly: they are the negative gradient of the predicted energy with respect to
-    the atomic positions, F_i = -dE/dr_i. With a rotationally invariant energy model this gives rotationally
-    equivariant forces and an energy-conserving force field.
+  answer: 'Forces are not predicted directly: they are the negative gradient of the predicted energy with respect
+    to the atomic positions, F_i = -dE/dr_i. With a rotationally invariant energy model this gives rotationally
+    equivariant forces and an energy-conserving force field.'
   evidence:
-    - paper: W2778051509
-      quote: "When using a rotationally invariant energy model, this ensures rotationally equivariant force predictions and guarantees an energy conserving force field"
+  - paper: W2778051509
+    quote: When using a rotationally invariant energy model, this ensures rotationally equivariant force predictions
+      and guarantees an energy conserving force field
 
 - id: q016
-  question: SchNet and NequIP both use continuous convolutions over neighboring atoms. What do their filters see about the neighbors, and how does that change the features they can build?
+  question: SchNet and NequIP both use continuous convolutions over neighboring atoms. What do their filters see
+    about the neighbors, and how does that change the features they can build?
   type: comparison
-  tags: [schnet, nequip]
+  tags:
+  - schnet
+  - nequip
   split: dev
-  answer: >-
-    SchNet's filters only see interatomic distances (expanded in Gaussians), so they are rotationally invariant
-    and the features stay scalars. NequIP's filters also use the direction to the neighbor, so its internal
-    features are geometric tensors that are equivariant to rotation; restricted to scalars it reduces to a
-    SchNet-style invariant network.
+  answer: SchNet's filters only see interatomic distances (expanded in Gaussians), so they are rotationally invariant
+    and the features stay scalars. NequIP's filters also use the direction to the neighbor, so its internal features
+    are geometric tensors that are equivariant to rotation; restricted to scalars it reduces to a SchNet-style invariant
+    network.
   evidence:
-    - paper: W2778051509
-      quote: "It is straightforward to include rotational invariance by computing pairwise distances instead of using relative positions."
-    - paper: W4225405705
-      quote: "making the network a conventional invariant GNN-IP, involving only invariant convolutions over scalar features in a SchNet-style fashion"
+  - paper: W2778051509
+    quote: It is straightforward to include rotational invariance by computing pairwise distances instead of using
+      relative positions.
+  - paper: W4225405705
+    quote: making the network a conventional invariant GNN-IP, involving only invariant convolutions over scalar
+      features in a SchNet-style fashion
 
 - id: q017
-  question: Which kernel method did the SchNet paper compare against on MD17, and how does NequIP do against kernel methods of that kind?
+  question: Which kernel method did the SchNet paper compare against on MD17, and how does NequIP do against kernel
+    methods of that kind?
   type: multihop
-  tags: [schnet, nequip]
+  tags:
+  - schnet
+  - nequip
   split: dev
-  answer: >-
-    SchNet compared against GDML (gradient-domain machine learning), which was more data-efficient on the small
-    training set for most molecules. The NequIP paper reports outperforming kernel-based approaches, including
+  answer: SchNet compared against GDML (gradient-domain machine learning), which was more data-efficient on the
+    small training set for most molecules. The NequIP paper reports outperforming kernel-based approaches, including
     sGDML (the symmetrized successor of GDML), as well as GAP and FCHL19.
   evidence:
-    - paper: W2778051509
-      quote: "We also list the performances of gradient domain machine learning (GDML)21 and DTNN28 for reference."
-    - paper: W4225405705
-      quote: "We find that NequIP significantly outperforms invariant GNN-IPs (such as SchNet [9] and DimeNet [11]), shallow neural networks (such as ANI [40]), and kernel-based approaches"
+  - paper: W2778051509
+    quote: We also list the performances of gradient domain machine learning (GDML)21 and DTNN28 for reference.
+  - paper: W4225405705
+    quote: We find that NequIP significantly outperforms invariant GNN-IPs (such as SchNet [9] and DimeNet [11]),
+      shallow neural networks (such as ANI [40]), and kernel-based approaches
   notes: Multi-hop on purpose. The second search depends on knowing the first answer (GDML).
 
 - id: q018
-  question: Both SchNet and the Behler-Parrinello potential build the prediction from atomic contributions. For which properties does the SchNet paper say this is a poor fit?
+  question: Both SchNet and the Behler-Parrinello potential build the prediction from atomic contributions. For
+    which properties does the SchNet paper say this is a poor fit?
   type: comparison
-  tags: [schnet, behler-parrinello]
+  tags:
+  - schnet
+  - behler-parrinello
   split: dev
-  answer: >-
-    Behler-Parrinello writes the total energy as a sum of atomic energies. SchNet does the same for its targets
-    and does noticeably worse on the polarizability and the electronic spatial extent <R^2> of QM9 molecules,
-    which the authors attribute to that atom-wise decomposition not suiting these properties.
+  answer: Behler-Parrinello writes the total energy as a sum of atomic energies. SchNet does the same for its targets
+    and does noticeably worse on the polarizability and the electronic spatial extent <R^2> of QM9 molecules, which
+    the authors attribute to that atom-wise decomposition not suiting these properties.
   evidence:
-    - paper: W2025444507
-      quote: "The main idea is to represent the total energy E of the system as a sum of atomic contributions Ei, an approach that is typically also used in empirical potentials"
-    - paper: W2778051509
-      quote: "This is most likely due to the decomposition of the energy into atomic contributions which is not appropriate for these properties."
+  - paper: W2025444507
+    quote: The main idea is to represent the total energy E of the system as a sum of atomic contributions Ei, an
+      approach that is typically also used in empirical potentials
+  - paper: W2778051509
+    quote: This is most likely due to the decomposition of the energy into atomic contributions which is not appropriate
+      for these properties.
 
 - id: q019
   question: What problem with CHARMM36 was CHARMM36m designed to fix?
   type: lookup
-  tags: [force-fields, charmm]
+  tags:
+  - force-fields
+  - charmm
   split: dev
-  answer: >-
-    CHARMM36 overstabilized compact and left-handed helical structures in intrinsically disordered proteins
-    and peptides. CHARMM36m was refined to describe disordered proteins better while keeping the accuracy of
-    CHARMM36 for folded proteins.
+  answer: CHARMM36 overstabilized compact and left-handed helical structures in intrinsically disordered proteins
+    and peptides. CHARMM36m was refined to describe disordered proteins better while keeping the accuracy of CHARMM36
+    for folded proteins.
   evidence:
-    - paper: W_CHARMM36M_TODO
-  notes: "TODO: answer written from memory; check it against the paper. Find the id with: grep -i charmm36m corpus/manifest.csv, then add a quote."
+  - paper: W2555870966
+  notes: 'TODO: answer written from memory; check it against the paper. Find the id with: grep -i charmm36m corpus/manifest.csv,
+    then add a quote.'
 
 - id: q020
   question: Which parts of the force field were changed to go from CHARMM36 to CHARMM36m?
   type: lookup
-  tags: [force-fields, charmm]
+  tags:
+  - force-fields
+  - charmm
   split: dev
-  answer: >-
-    Mainly the backbone CMAP correction was refit, to reduce the left-handed helix bias, and the paper recommends
+  answer: Mainly the backbone CMAP correction was refit, to reduce the left-handed helix bias, and the paper recommends
     a modified TIP3P water with a stronger Lennard-Jones interaction on the water hydrogens, so that disordered
     proteins are less overly compact.
   evidence:
-    - paper: W_CHARMM36M_TODO
-  notes: "TODO: answer written from memory, and the least certain of these. Check it, and correct the answer if the paper says otherwise."
+  - paper: W2555870966
+  notes: 'TODO: answer written from memory, and the least certain of these. Check it, and correct the answer if
+    the paper says otherwise.'
 
 - id: q021
   question: What experimental success rate does RFdiffusion reach when designing protein binders?
   type: unanswerable
-  tags: [out-of-scope]
+  tags:
+  - out-of-scope
   split: dev
   answer: Not answerable from this corpus, which covers interatomic potentials and force fields, not protein design.
   notes: Off-topic for the corpus; checks that the system says so instead of guessing.
@@ -187,9 +355,166 @@
 - id: q022
   question: What dropout rate was used when training SchNet?
   type: unanswerable
-  tags: [schnet]
+  tags:
+  - schnet
   split: dev
-  answer: Not in the corpus. The SchNet paper describes its optimizer, batch size and learning-rate decay, but no dropout.
+  answer: Not in the corpus. The SchNet paper describes its optimizer, batch size and learning-rate decay, but no
+    dropout.
+  notes: 'A near-miss on purpose: the training section looks like it should contain this, so a weak system may invent
+    a number. Review the retrieved passages once; if a corpus paper does report SchNet dropout, change the type.'
+    
+- id: q023
+  question: What does DiffTRe do differently from backpropagating through an MD simulation, and what does that buy it?
+  type: lookup
+  tags: [definition, difftre]
+  split: dev
+  answer: >-
+    It doesn't differentiate through the simulation at all. It combines automatic differentiation with MD
+    reweighting, so gradients flow through the reweighted ensemble averages instead of the trajectory. For
+    time-independent observables this avoids exploding gradients and makes gradient computation about two
+    orders of magnitude faster, with memory needs similar to the adjoint method.
+  evidence:
+    - paper: W3168247670
+      quote: "DiffTRe offers end-to-end gradient computation and circumvents the need to differentiate through the simulation by combining AD with previous work on MD reweighting schemes"
+ 
+- id: q024
+  question: How are the reweighting weights computed in DiffTRe, and why does the kinetic energy drop out?
+  type: lookup
+  tags: [equation, difftre]
+  split: dev
+  answer: >-
+    In the canonical ensemble, each saved state gets w_i = exp(-beta (U_theta(S_i) - U_ref(S_i))), normalized
+    over all states. Only the potential energy appears because the kinetic energy is the same under the old and
+    new potential and cancels in the Boltzmann ratio. With theta equal to the reference, all weights are 1/N.
+  evidence:
+    - paper: W3168247670
+      quote: "Inserting pθ(Si) into Eq. (3) allows computing weights as a function of θ (the kinetic energy cancels)"
+ 
+- id: q025
+  question: When does DiffTRe stop reusing the old trajectory and simulate a new one?
+  type: lookup
+  tags: [difftre]
+  split: dev
+  answer: >-
+    When the effective sample size of the reweighted states, N_eff ~ exp(-sum w_i ln w_i), falls below a chosen
+    threshold, meaning a few states dominate the average and its statistical error is too large. A new
+    reference trajectory is then run with the current parameters, starting from the last state of the old one.
+  evidence:
+    - paper: W3168247670
+      quote: "As soon as Neff < N̄eff, a new reference trajectory needs to be sampled using the current θ as the new ˆθ."
+ 
+- id: q026
+  question: Which experimental data was the DiffTRe diamond potential trained on?
+  type: lookup
+  tags: [numeric, difftre]
+  split: dev
+  answer: >-
+    The experimental elastic stiffness tensor of diamond, which by cubic symmetry has three moduli: C11 = 1079 GPa,
+    C12 = 124 GPa and C44 = 578 GPa. Training also targeted a stress-free state at zero strain.
+  evidence:
+    - paper: W3168247670
+      quote: "we learn a DimeNet++ [12] potential for diamond from its experimental elastic stiffness tensor C"
+ 
+- id: q027
+  question: Which held-out property did DiffTRe's coarse-grained water model get wrong, and why?
+  type: lookup
+  tags: [numeric, difftre]
+  split: dev
+  answer: >-
+    The self-diffusion coefficient: about 10.9 versus 2.2 μm²/ms in experiment, so diffusion is too fast. Coarse-
+    grained models have smoother energy surfaces, which speeds up their dynamics compared with atomistic models.
+    (The tetrahedral order parameter, by contrast, matched closely.)
+  evidence:
+    - paper: W3168247670
+      quote: "The learned CG water model predicts a larger self-diffusion coefficient than were experimentally measured"
+    - paper: W3168247670
+      quote: "Due to smoother PESs, CG models exhibit accelerated dynamical processes compared to atomistic models"
+  notes: Two passages from the same paper, but one answer; kept as lookup.
+ 
+- id: q028
+  question: Could you use DiffTRe to fit a potential to a measured diffusion coefficient?
+  type: lookup
+  tags: [difftre]
+  split: dev
+  answer: >-
+    No. Reweighting treats the trajectory as a set of states and ignores their order in time, so dynamical
+    properties such as diffusion coefficients can't be targets; only time-independent observables can.
+  evidence:
+    - paper: W3168247670
+      quote: "The reweighting scheme renders DiffTRe invariant to the sequence of states in the trajectory. Hence, dynamical properties cannot be employed as target observables."
+  notes: Phrased without the paper's wording on purpose (diffusion, not "dynamical properties").
+ 
+- id: q029
+  question: SchNet's C20 force field was trained on DFT data. What do the DiffTRe authors see as the main limitation of that kind of training, and what do they train on instead?
+  type: comparison
+  tags: [difftre, schnet]
+  split: dev
+  answer: >-
+    SchNet is trained bottom-up on DFT reference calculations (PBE+vdW-TS for C20). DiffTRe's authors argue that
+    bottom-up training is limited by the availability of precise and broad enough quantum data sets, and that its
+    accuracy is capped by the reference method. DiffTRe trains top-down instead, so that simulations reproduce
+    experimental observables.
+  evidence:
+    - paper: W2778051509
+      quote: "By training SchNet on DFT data at the PBE+vdWTS level, we reduce the computation time per single point by three orders of magnitude"
+    - paper: W3168247670
+      quote: "Thus, the main obstacle in bottom-up learning of NN potentials is currently limited availability of highly precise and sufficiently broad data sets."
+ 
+- id: q030
+  question: DiffTRe's diamond model starts from an empirical potential originally built for another element. Which potential was it, and which neural network potential paper used that same element as its test system?
+  type: multihop
+  tags: [difftre, behler-parrinello]
+  split: dev
+  answer: >-
+    The Stillinger-Weber potential parametrized for silicon, rescaled for carbon. Silicon is also the test system
+    of the original Behler-Parrinello neural network potential, which was compared against empirical potentials
+    and DFT for bulk silicon.
+  evidence:
+    - paper: W3168247670
+      quote: "To demonstrate learning, we select the original Stillinger-Weber potential [46] parametrized for silicon as Uprior."
+    - paper: W2025444507
+      quote: "The high accuracy of the method is demonstrated for bulk silicon and compared with empirical potentials and DFT"
+  notes: Multi-hop on purpose. You need the element from the first passage (silicon) to find the second.
+ 
+- id: q031
+  question: Which graph neural network does DiffTRe use as its learnable potential, and how does NequIP compare with that family of models on MD-17?
+  type: multihop
+  tags: [difftre, nequip]
+  split: dev
+  answer: >-
+    DimeNet++ (an improved DimeNet), used for both diamond and coarse-grained water. NequIP reports significantly
+    outperforming invariant graph network potentials, naming SchNet and DimeNet, on MD-17.
+  evidence:
+    - paper: W3168247670
+      quote: "Second, we train the state-of-the-art graph neural network potential DimeNet++ [11, 12] for an atomistic model of diamond from its experimental stiffness tensor."
+    - paper: W4225405705
+      quote: "We find that NequIP significantly outperforms invariant GNN-IPs (such as SchNet [9] and DimeNet [11])"
+  notes: NequIP compares against DimeNet, not DimeNet++; the answer should say so rather than blur the two.
+ 
+- id: q032
+  question: In DiffTRe, what is the prior potential for, if not a Bayesian prior?
+  type: lookup
+  tags: [definition, difftre]
+  split: dev
+  answer: >-
+    A simple physics-based potential (e.g. a repulsive Lennard-Jones term, or Stillinger-Weber) added to the neural
+    network. Early in training it controls which configurations the simulations visit, and therefore where the
+    gradient carries information. It also gives a physics-informed starting point, so the network learns a
+    correction to the prior. If the data contradicts the prior, the network overrides it.
+  evidence:
+    - paper: W3168247670
+      quote: "Rather, the prior serves to control the data (trajectory) generation in the beginning of the optimization."
+ 
+- id: q033
+  question: How many GPU hours did it take in total to train the DiffTRe diamond potential?
+  type: unanswerable
+  tags: [difftre]
+  split: dev
+  answer: >-
+    Not in the corpus. The main text gives only per-update wall-clock times for the toy example and refers to the
+    supplementary information for the diamond training curve; no total training cost is stated.
   notes: >-
-    A near-miss on purpose: the training section looks like it should contain this, so a weak system may invent
-    a number. Review the retrieved passages once; if a corpus paper does report SchNet dropout, change the type.
+    A near-miss on purpose: nearby passages discuss speed-ups and time per update, which a weak system may turn
+    into a made-up total. If you later add the supplementary information to the corpus, check this again.
+ 
+
