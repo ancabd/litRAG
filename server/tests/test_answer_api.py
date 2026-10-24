@@ -104,3 +104,24 @@ def test_answer_eval_extractive_no_judge_and_errors(client, monkeypatch):
     assert r.status_code == 503
     assert client.post("/api/evals", json={"kind": "nonsense"}).status_code == 400
     assert client.get("/api/jobs/nope").status_code == 404
+
+
+def test_ask_with_agent_returns_trace(client, monkeypatch):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "corpus-builder"))
+    from generation.agent import AgentGenerator
+    from generation.llm import ScriptedLLM
+
+    def respond(system, messages, tools):
+        if len(messages) == 1:
+            return {"text": "Searching.", "tool_calls": [{"name": "search", "input": {"query": "silicon"}}]}
+        return {"tool_calls": [{"name": "answer", "input": {"answer": "Bulk silicon [W1#000]."}}]}
+
+    llm = ScriptedLLM(chat_respond=respond, model="claude-haiku-5-5")
+    svc = client.app.state.services
+    monkeypatch.setattr(svc.answering, "generator", lambda name, model: AgentGenerator(llm))
+    a = client.post("/api/ask", json={"question": "Which material was used?", "generator": "agent"}).json()
+    assert a["answer"] == "Bulk silicon [W1#000]." and a["citations"] == ["W1#000"]
+    assert [s["action"] for s in a["trace"]] == ["search", "answer"] and a["trace"][0]["thought"] == "Searching."
+    assert any(p["cited_as"] == 1 for p in a["passages"])
