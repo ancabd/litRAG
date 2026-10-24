@@ -1,6 +1,6 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { useCompare } from "../api/hooks";
-import type { EvalCompare } from "../api/types";
+import type { Effort, EvalCompare, PairedDiff } from "../api/types";
 import { ErrorBanner } from "../components/ui";
 import { outcome } from "./ResultPage";
 import { when } from "./ResultsPage";
@@ -44,6 +44,87 @@ const rankText = (r: { strict_rank: number | null; lenient_rank: number | null }
   return "miss";
 };
 
+const signed = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}`;
+
+function PairedTable({ pair, labels, runName }: {
+  pair: EvalCompare["paired"][number];
+  labels: [string, string][];
+  runName: (name: string) => string;
+}) {
+  const rows = labels.filter(([m]) => pair.metrics[m]);
+  const headline = pair.metrics[labels[0][0]] as PairedDiff | undefined;
+  const qlinks = (ids: string[]) =>
+    ids.map((id, i) => (
+      <span key={id}>
+        {i > 0 && ", "}
+        <Link to={`/questions/${id}`}>{id}</Link>
+      </span>
+    ));
+  return (
+    <div style={{ marginTop: 10 }}>
+      <p className="small" style={{ margin: "0 0 8px" }}>
+        <strong>{runName(pair.run)}</strong> compared with <strong>{runName(pair.base)}</strong>, question by question
+      </p>
+      <div className="table-wrap">
+        <table className="data static">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th className="num">n</th>
+              <th className="num">Before</th>
+              <th className="num">After</th>
+              <th>Difference [95% CI]</th>
+              <th className="num" title="Questions where the second run did better / worse / the same">Better / worse / same</th>
+              <th className="num" title="Two-sided exact sign test on better vs worse">p</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(([m, label]) => {
+              const r = pair.metrics[m];
+              const improved = r.lower_is_better ? r.diff < 0 : r.diff > 0;
+              const tone = r.clear ? (improved ? "diff-up" : "diff-down") : "";
+              return (
+                <tr key={m}>
+                  <td>{label}</td>
+                  <td className="num">{r.n}</td>
+                  <td className="num">{r.mean_a.toFixed(2)}</td>
+                  <td className="num">{r.mean_b.toFixed(2)}</td>
+                  <td className={tone}>
+                    {signed(r.diff)} <span className="muted xs">[{signed(r.lo)}, {signed(r.hi)}]</span>
+                  </td>
+                  <td className="num">
+                    {r.better} / {r.worse} / {r.tied}
+                  </td>
+                  <td className="num">{r.p < 0.001 ? "<0.001" : r.p.toFixed(3)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {headline && (headline.better_ids.length > 0 || headline.worse_ids.length > 0) && (
+        <p className="small" style={{ marginTop: 8 }}>
+          {labels[0][1]}:{" "}
+          {headline.better_ids.length > 0 && <>better on {qlinks(headline.better_ids)}</>}
+          {headline.better_ids.length > 0 && headline.worse_ids.length > 0 && "; "}
+          {headline.worse_ids.length > 0 && <>worse on {qlinks(headline.worse_ids)}</>}.
+        </p>
+      )}
+    </div>
+  );
+}
+
+const EFFORT_ROWS: [keyof Effort, string, (v: number) => string][] = [
+  ["turns", "Model calls", (v) => v.toFixed(1)],
+  ["searches", "Searches", (v) => v.toFixed(1)],
+  ["passages_read", "Passages read", (v) => v.toFixed(1)],
+  ["input_tokens", "Input tokens", (v) => Math.round(v).toLocaleString()],
+  ["cost", "Cost per question", (v) => `$${v.toFixed(4)}`],
+  ["seconds", "Seconds per question", (v) => v.toFixed(1)],
+  ["gave_up", "Gave up", (v) => `${Math.round(v * 100)}%`],
+  ["hit_budget", "Ran out of budget", (v) => `${Math.round(v * 100)}%`],
+];
+
 export function ComparePage() {
   const [params] = useSearchParams();
   const names = (params.get("names") ?? "").split(",").filter(Boolean);
@@ -55,7 +136,7 @@ export function ComparePage() {
   const cellText = answers ? answerText : rankText;
   const setup = (r: EvalCompare["runs"][number]) =>
     r.kind === "answer"
-      ? `${r.generator?.model ?? "extractive"}, ${r.retriever?.name} top ${r.k}, ${r.split}`
+      ? `${r.generator?.name === "agent" ? `agent (${r.generator.model})` : r.generator?.model ?? "extractive"}, ${r.retriever?.name} top ${r.k}, ${r.split}`
       : `${r.retriever?.name} on ${r.chunks}, ${r.split}`;
 
   return (
@@ -66,7 +147,10 @@ export function ComparePage() {
       <div className="page-head">
         <div>
           <h1>Compare runs</h1>
-          <p className="sub">Means with 95% intervals. Overlapping intervals mean the difference isn't established yet.</p>
+          <p className="sub">
+            Each run's means with 95% intervals, then the paired comparison: the same questions, run by run. With a few dozen
+            questions the paired comparison is the one that can show a real difference.
+          </p>
         </div>
       </div>
       {cmp.error && <ErrorBanner error={cmp.error} />}
@@ -119,6 +203,52 @@ export function ComparePage() {
               </tbody>
             </table>
           </div>
+
+          {c.paired.length > 0 && (
+            <section className="section-block">
+              <h2>Paired comparison</h2>
+              <p className="small muted" style={{ margin: "4px 0 0", maxWidth: "86ch" }}>
+                Per question, how much each run differs from the first one. A colored difference has a 95% interval that
+                excludes zero; p is an exact sign test on the better/worse counts. Testing many metrics at once, about one in
+                twenty comparisons shows p &lt; 0.05 by chance.
+              </p>
+              {c.paired.map((pair) => (
+                <PairedTable key={pair.run} pair={pair} labels={metrics} runName={(n) => {
+                  const r = c.runs.find((x) => x.name === n);
+                  return r ? `${setup(r)} (${when(r.created)})` : n;
+                }} />
+              ))}
+            </section>
+          )}
+
+          {answers && c.runs.some((r) => r.effort) && (
+            <section className="section-block">
+              <h2>Effort per question</h2>
+              <div className="table-wrap" style={{ marginTop: 10 }}>
+                <table className="data static">
+                  <thead>
+                    <tr>
+                      <th />
+                      {c.runs.map((r) => (
+                        <th key={r.name} className="num">{setup(r).split(",")[0]}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {EFFORT_ROWS.map(([key, label, fmt]) => (
+                      <tr key={key}>
+                        <td>{label}</td>
+                        {c.runs.map((r) => {
+                          const v = r.effort?.[key];
+                          return <td key={r.name} className="num">{v == null ? "–" : fmt(v as number)}</td>;
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
 
           <section className="section-block">
             <h2>Per question</h2>

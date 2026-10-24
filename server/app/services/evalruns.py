@@ -11,7 +11,7 @@ import shutil
 import threading
 from pathlib import Path
 
-from ..core import agreement, run_answer_eval, run_eval
+from ..core import agreement, paired_compare, run_answer_eval, run_eval
 
 NAME = re.compile(r"^[A-Za-z0-9_.@-]+$")
 HEADLINE = ["hit@1", "hit@5", "hit@10", "recall@10", "mrr", "ndcg@10", "paper_hit@10"]
@@ -90,6 +90,7 @@ class EvalRunService:
             "judge": s.get("judge"),
             "k": s.get("k"),
             "usage": s.get("usage"),
+            "effort": s.get("effort"),
             "created": s.get("created"),
             "retriever": s.get("retriever"),
             "chunks": Path(s.get("chunks") or "").name or None,
@@ -201,7 +202,16 @@ class EvalRunService:
                         rows[r["id"]] = entry
             runs.append((n, s, rows))
         ids = sorted({qid for _, _, rows in runs for qid in rows})
+        kinds = {s.get("kind") or "retrieval" for _, s, _ in runs}
+        paired = []
+        if len(kinds) == 1:
+            metrics = ANSWER_HEADLINE if kinds == {"answer"} else \
+                HEADLINE + ["lenient_" + m for m in ("hit@5", "hit@10", "mrr")]
+            base = self._dir(names[0])
+            for n in names[1:]:
+                paired.append({"base": names[0], "run": n, "metrics": paired_compare(base, self._dir(n), metrics)})
         return {
+            "paired": paired,
             "runs": [{**self._brief(n, s), "results": (s.get("results") or {}).get("all") or {}} for n, s, _ in runs],
             "same_questions": len({s.get("questions_sha1") for _, s, _ in runs}) <= 1,
             "kinds": sorted({s.get("kind") or "retrieval" for _, s, _ in runs}),

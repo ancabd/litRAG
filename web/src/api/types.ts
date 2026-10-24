@@ -187,6 +187,7 @@ export interface EvalBrief {
   judge: { model?: string; prompt?: string } | null;
   k: number | null;
   usage: { generator: Usage; judge: Usage | null } | null;
+  effort?: Effort | null;
   created: string | null;
   retriever: Record<string, unknown> & { name: string };
   chunks: string | null;
@@ -245,7 +246,40 @@ export interface EvalDetail extends EvalBrief {
   agreement?: { n: number; agreement: number | null; kappa: number | null; disagreements: string[] };
 }
 
+export interface Effort {
+  turns: number | null;
+  tool_calls: number | null;
+  searches: number | null;
+  passages_read: number | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  cache_read_tokens: number | null;
+  cost: number | null;
+  seconds: number | null;
+  total_cost: number | null;
+  gave_up: number;
+  hit_budget: number;
+}
+
+export interface PairedDiff {
+  n: number;
+  mean_a: number;
+  mean_b: number;
+  diff: number;
+  lo: number;
+  hi: number;
+  better: number;
+  worse: number;
+  tied: number;
+  better_ids: string[];
+  worse_ids: string[];
+  p: number;
+  lower_is_better: boolean;
+  clear: boolean;
+}
+
 export interface EvalCompare {
+  paired: { base: string; run: string; metrics: Record<string, PairedDiff> }[];
   runs: (EvalBrief & { results: Record<string, Interval> })[];
   same_questions: boolean;
   kinds: string[];

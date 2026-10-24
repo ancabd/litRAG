@@ -116,7 +116,7 @@ def test_ask_with_agent_returns_trace(client, monkeypatch):
     def respond(system, messages, tools):
         if len(messages) == 1:
             return {"text": "Searching.", "tool_calls": [{"name": "search", "input": {"query": "silicon"}}]}
-        return {"tool_calls": [{"name": "answer", "input": {"answer": "Bulk silicon [W1#000]."}}]}
+        return "Bulk silicon [W1#000]."
 
     llm = ScriptedLLM(chat_respond=respond, model="claude-haiku-5-5")
     svc = client.app.state.services

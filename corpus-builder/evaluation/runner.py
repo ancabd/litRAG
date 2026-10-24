@@ -237,4 +237,20 @@ def compare_runs(run_dirs: list[Path], metrics: list[str] | None = None) -> str:
                                            for s in summaries) + " |")
     if len(hashes) > 1:
         out.append("\n**Warning:** these runs used different question files; numbers are not comparable.")
+    from .paired import format_paired, paired_compare
+    for d, name in zip(run_dirs[1:], names[1:]):
+        out += ["", format_paired(names[0], name, paired_compare(Path(run_dirs[0]), Path(d), metrics))]
+    effort = [s.get("effort") for s in summaries]
+    if any(effort):
+        keys = ["turns", "searches", "passages_read", "input_tokens", "cost", "seconds"]
+        out += ["", "Effort per question (mean):", "", "| | " + " | ".join(names) + " |", "|---|" + "---|" * len(names)]
+        for k in keys:
+            out.append(f"| {k} | " + " | ".join(_effort_cell(e, k) for e in effort) + " |")
     return "\n".join(out)
+
+
+def _effort_cell(effort: dict | None, key: str) -> str:
+    if not effort or effort.get(key) is None:
+        return "-"
+    v = effort[key]
+    return f"${v:.4f}" if key == "cost" else (f"{v:,.0f}" if key == "input_tokens" else f"{v:.1f}")

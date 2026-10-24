@@ -25,6 +25,9 @@ def test_start_list_get_compare_delete(client, data_dir):
     assert [r["name"] for r in cmp["runs"]] == [first, second] and cmp["same_questions"]
     assert cmp["questions"][0]["id"] == "q001" and cmp["questions"][0]["per_run"][1]["strict_rank"] == 1
     assert "lenient_mrr" in cmp["runs"][0]["results"]
+    pair = cmp["paired"][0]
+    assert pair["base"] == first and pair["run"] == second
+    assert pair["metrics"]["mrr"]["diff"] == 0 and pair["metrics"]["mrr"]["tied"] == pair["metrics"]["mrr"]["n"]
 
     assert client.delete(f"/api/evals/{first}").status_code == 200
     assert [i["name"] for i in client.get("/api/evals").json()["items"]] == [second]

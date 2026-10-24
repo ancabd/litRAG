@@ -71,7 +71,7 @@ Runs can be started from the terminal (`python evaluate.py run`) or from the app
 - `summary.json`: all numbers plus the full configuration: retriever settings, chunk config, parser version, question file hash, git commit
 - `per_question.jsonl`: gold and retrieved chunks for each question, for error analysis
 
-Compare runs side by side (it warns if the question file changed between them):
+Compare runs side by side (it warns if the question file changed between them). Besides each run's means, it prints a paired comparison of every run against the first, question by question: mean difference with a paired bootstrap interval, how many questions got better / worse / stayed the same, and an exact sign test (see `evaluation/paired.py`). For answer runs it also prints effort per question (model calls, searches, tokens, cost, time).
 
 ```bash
 python evaluate.py compare ../data/runs/<bm25 run> ../data/runs/<other run>
@@ -81,7 +81,7 @@ Worth committing the `report.md` files: together they're the history of the proj
 
 ## Answer evaluation
 
-`ask` and `answer` need `ANTHROPIC_API_KEY` (create a key at https://platform.claude.com). The options both share: `--retriever`, `--k` (passages given to the model, default 8), `--generator claude|extractive`, `--model` (default `claude-sonnet-5-5`), `--no-cache`. `answer` also takes `--judge <model>` (default: the generator's model; `none` for no judge), `--split`, `--name`.
+`ask` and `answer` need `ANTHROPIC_API_KEY` (create a key at https://platform.claude.com). The options both share: `--retriever`, `--k` (passages per search, default 8), `--generator claude|extractive|agent`, `--model` (default `claude-sonnet-5-5`), `--no-cache`. The agent also takes `--max-turns` (default 8), `--token-budget` (default 100000) and `--tools` (e.g. `search,read_around`, for ablations); how it works is in the top-level README. `answer` also takes `--judge <model>` (default: the generator's model; `none` for no judge), `--split`, `--name`.
 
 For each question it retrieves the top k passages, asks the model to answer from them only, citing each claim as `[chunk_id]`, or to say the passages don't answer it. Then:
 

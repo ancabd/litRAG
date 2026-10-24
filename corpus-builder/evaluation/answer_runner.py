@@ -37,6 +37,41 @@ METRICS = ["correct", "supported", "cites_gold", "retrieved_gold", "invalid_cita
 HIGHER_IS_BETTER = {"invalid_citations": False, "abstained_when_answerable": False}
 
 
+EFFORT = ["turns", "tool_calls", "searches", "passages_read", "input_tokens", "output_tokens", "cache_read_tokens",
+          "cost", "seconds"]
+
+
+def effort_of(ans) -> dict:
+    """How much work one answer took: model calls, tool calls, passages read, tokens, cost, time."""
+    steps = ans.trace or []
+    tools = [s for s in steps if s["action"] not in ("answer", "give_up")]
+    return {
+        "turns": sum(1 for s in steps if s.get("input_tokens")),  # one per model call
+        "tool_calls": len(tools),
+        "searches": sum(1 for s in tools if s["action"] == "search"),
+        "passages_read": len(ans.passages),
+        "input_tokens": ans.input_tokens, "output_tokens": ans.output_tokens,
+        "cache_read_tokens": ans.cache_read_tokens,
+        "cost": ans.cost, "seconds": ans.seconds,
+        "gave_up": any(s["action"] == "give_up" for s in steps),
+        "hit_budget": any("budget" in w for w in ans.warnings),
+    }
+
+
+def summarize_effort(rows: list[dict]) -> dict:
+    """Means over questions (cost: also the total), plus how often it gave up or ran out of budget."""
+    out: dict = {}
+    for k in EFFORT:
+        vals = [r["effort"][k] for r in rows if r["effort"].get(k) is not None]
+        out[k] = sum(vals) / len(vals) if vals else None
+    costs = [r["effort"]["cost"] for r in rows if r["effort"].get("cost") is not None]
+    out["total_cost"] = round(sum(costs), 4) if costs else None
+    n = len(rows) or 1
+    out["gave_up"] = sum(r["effort"]["gave_up"] for r in rows) / n
+    out["hit_budget"] = sum(r["effort"]["hit_budget"] for r in rows) / n
+    return out
+
+
 def _passage(c: dict) -> dict:
     return {k: c.get(k) for k in ("chunk_id", "paper_id", "title", "year", "section", "page_start", "text")}
 
@@ -107,6 +142,7 @@ def run_answer_eval(questions_path: Path, chunks_path: Path, generator: Generato
             "retrieved": [{"chunk_id": p["chunk_id"], "score": p["score"], "rank": p["rank"]} for p in ans.passages],
             "judgments": judgments,
             "metrics": m,
+            "effort": effort_of(ans),
         })
         if progress:
             progress(i, len(questions))
@@ -124,7 +160,10 @@ def run_answer_eval(questions_path: Path, chunks_path: Path, generator: Generato
 
     chunks_dir = Path(chunks_path) if Path(chunks_path).is_dir() else Path(chunks_path).parent
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    gen_name = generator.config().get("model") or generator.config()["name"]
+    cfg = generator.config()
+    gen_name = cfg.get("model") or cfg["name"]
+    if cfg["name"] != "claude" and cfg.get("model"):
+        gen_name = f"{cfg['name']}-{cfg['model']}"  # e.g. agent-claude-haiku-5-5
     run_dir = (Path(out_root) / (name or f"{stamp}_answers_{gen_name}_{retriever_name}_{chunks_dir.name}_{split or 'all'}")).resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
     no_reference = [r["id"] for r in rows if r["type"] != "unanswerable" and not r["reference"]]
@@ -148,6 +187,7 @@ def run_answer_eval(questions_path: Path, chunks_path: Path, generator: Generato
         "no_reference_answer": no_reference,
         "excluded": [],
         "results": results,
+        "effort": summarize_effort(rows),
         "usage": {
             "generator": {"input_tokens": gen_in, "output_tokens": gen_out, "cost": round(gen_cost, 4)},
             "judge": ({"input_tokens": judge.input_tokens, "output_tokens": judge.output_tokens,
@@ -174,6 +214,12 @@ LABELS = {
 }
 
 
+def _step_text(st: dict) -> str:
+    inp = st.get("input") or {}
+    main = inp.get("query") or inp.get("chunk_id") or inp.get("paper_id") or ""
+    return f"{st['action']}" + (f" \"{main}\"" if main else "") + (f" ({st['note']})" if st.get("note") else "")
+
+
 def render_answer_report(summary: dict, rows: list[dict]) -> str:
     res = summary["results"]
     g = summary["generator"]
@@ -197,6 +243,13 @@ def render_answer_report(summary: dict, rows: list[dict]) -> str:
             v = res[grp]["correct"]
             lines.append(f"\nCorrect when {'the evidence was' if grp.endswith('found') else 'no evidence was'} "
                          f"retrieved: {v['mean']:.2f} (n={v['n']})")
+    e = summary.get("effort") or {}
+    if e.get("turns") is not None:
+        cost = f", ${e['cost']:.4f} per question" if e.get("cost") else ""
+        lines += ["", "## Effort per question (mean)", "",
+                  f"{e['turns']:.1f} model calls, {e['tool_calls']:.1f} tool calls ({e['searches']:.1f} searches), "
+                  f"{e['passages_read']:.1f} passages read, {e['input_tokens']:,.0f} input tokens"
+                  f"{cost}, {e['seconds']:.1f} s. Gave up on {e['gave_up']:.0%}, ran out of budget on {e['hit_budget']:.0%}."]
     lines += ["", "## Answers", ""]
     for r in rows:
         c = r["judgments"].get("correctness", {})
@@ -209,5 +262,8 @@ def render_answer_report(summary: dict, rows: list[dict]) -> str:
             lines.append(f"- correctness: {c.get('verdict')} ({c.get('reason')})")
         if s:
             lines.append(f"- support: {s.get('verdict')} ({s.get('reason')})")
+        steps = r["answer"].get("trace") or []
+        if any(st["action"] not in ("search", "answer") for st in steps) or sum(st["action"] == "search" for st in steps) > 1:
+            lines.append("- steps: " + "; ".join(_step_text(st) for st in steps))
         lines.append("")
     return "\n".join(lines) + "\n"

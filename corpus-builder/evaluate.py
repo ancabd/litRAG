@@ -13,8 +13,10 @@ Examples:
   python evaluate.py search "radial symmetry function cutoff"
   python evaluate.py run
   python evaluate.py ask "What test system did Behler and Parrinello use?"
+  python evaluate.py ask --generator agent "Which cutoff radius does NequIP use, and how does it compare to SchNet?"
   python evaluate.py answer                         # claude-sonnet-5-5 answers, judged by the same model
   python evaluate.py answer --generator extractive --judge none     # no API key needed
+  python evaluate.py answer --generator agent --model claude-haiku-5-5 --judge claude-sonnet-5-5
   python evaluate.py compare data/runs/A data/runs/B
 """
 from __future__ import annotations
@@ -114,7 +116,39 @@ def cmd_run(args) -> int:
 
 def _generator(args):
     from generation import get_generator
-    return get_generator(args.generator, model=args.model, cache_dir=None if args.no_cache else paths.CACHE / "llm")
+    options = {}
+    if args.generator == "agent":
+        options = {"max_turns": args.max_turns, "token_budget": args.token_budget}
+        if args.tools:
+            options["tools"] = tuple(t.strip() for t in args.tools.split(",") if t.strip())
+    return get_generator(args.generator, model=args.model, cache_dir=None if args.no_cache else paths.CACHE / "llm",
+                         **options)
+
+
+def _short(v, n: int = 70) -> str:
+    v = v if isinstance(v, str) else ", ".join(f"{k}={x}" for k, x in v.items())
+    return v if len(v) <= n else v[: n - 1] + "…"
+
+
+def print_trace(ans, file=None) -> None:
+    """One line per step: what it did, what came back, tokens and time."""
+    file = file or sys.stderr
+    for s in ans.trace:
+        args = dict(s["input"])
+        main = args.pop("query", None) or args.pop("chunk_id", None) or args.pop("paper_id", None)
+        what = f'"{_short(main, 60)}"' if s["action"] == "search" else (_short(main) if main else "")
+        if args and s["action"] not in ("answer", "give_up"):
+            what += f" ({_short(args, 40)})"
+        if s["action"] in ("answer", "give_up"):
+            what = ""
+        tokens = f"{s['input_tokens']:,} in / {s['output_tokens']:,} out" if s["input_tokens"] else ""
+        if s.get("cache_read_tokens"):
+            tokens += f" ({s['cache_read_tokens']:,} cached)"
+        note = f"-> {s['note']}" if s.get("note") else ""
+        print(f"  {s['step']:>2}. {s['action']:<12}{what} {note}".rstrip() + (f"   [{tokens}, {s['seconds']:.1f}s]" if tokens else ""),
+              file=file)
+        if s.get("thought"):
+            print(textwrap.indent(textwrap.fill(s["thought"], 96), "      | "), file=file)
 
 
 def cmd_ask(args) -> int:
@@ -128,7 +162,13 @@ def cmd_ask(args) -> int:
         return 2
     ans = gen.answer(args.question, library, k=args.k, retriever=args.retriever)
     by_id = library.by_id
-    print(textwrap.fill(ans.answer, 100) if ans.answerable else f"Not answerable from the corpus. {ans.answer}")
+    if args.generator == "agent" or args.trace:
+        print("Steps:", file=sys.stderr)
+        print_trace(ans)
+        print(file=sys.stderr)
+    text = ans.answer if ans.answerable else f"Not answerable from the corpus. {ans.answer}"
+    # wrap each paragraph, keep the model's line breaks
+    print("\n".join(textwrap.fill(line, 100) if line.strip() else "" for line in text.splitlines()))
     if ans.citations:
         print("\nSources:")
         for i, cid in enumerate(ans.citations, 1):
@@ -137,8 +177,10 @@ def cmd_ask(args) -> int:
     for w in ans.warnings:
         print(f"note: {w}")
     cost = f", ${ans.cost:.4f}" if ans.cost else ""
-    print(f"\n{ans.generator.get('model') or ans.generator['name']}, {ans.seconds:.1f}s"
-          f"{', cached' if ans.cached else ''}{cost}", file=sys.stderr)
+    read = f" ({ans.cache_read_tokens:,} from the prompt cache)" if ans.cache_read_tokens else ""
+    tokens = f", {ans.input_tokens:,} input tokens{read}" if ans.input_tokens else ""
+    print(f"\n{ans.generator.get('model') or ans.generator['name']}, {len(ans.passages)} passages read, "
+          f"{ans.seconds:.1f}s{tokens}{', cached' if ans.cached else ''}{cost}", file=sys.stderr)
     return 0
 
 
@@ -201,19 +243,25 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--out", type=Path, default=paths.RUNS)
     r.add_argument("--name", default=None, help="run folder name (default: timestamp + config)")
 
+    from generation.answer import available_generators
     from generation.llm import DEFAULT_MODEL
 
     def gen_args(p):
         p.add_argument("--retriever", default="bm25", choices=available())
-        p.add_argument("-k", type=int, default=8, help="passages given to the generator (default: 8)")
-        p.add_argument("--generator", default="claude", choices=["claude", "extractive"])
+        p.add_argument("-k", type=int, default=8, help="passages per search (default: 8)")
+        p.add_argument("--generator", default="claude", choices=available_generators())
         p.add_argument("--model", default=DEFAULT_MODEL, help=f"generator model (default: {DEFAULT_MODEL})")
         p.add_argument("--no-cache", action="store_true", help="always call the model (default: reuse cached responses)")
+        p.add_argument("--max-turns", type=int, default=8, help="agent: most model calls per question (default: 8)")
+        p.add_argument("--token-budget", type=int, default=100_000,
+                       help="agent: most tokens per question over all turns (default: 100000)")
+        p.add_argument("--tools", help="agent: comma-separated tools (default: search,read_around,open_paper)")
 
     a = sub.add_parser("ask", help="answer one question from the corpus")
     common(a, questions=False)
     a.add_argument("question")
     gen_args(a)
+    a.add_argument("--trace", action="store_true", help="print the steps (always on for the agent)")
 
     an = sub.add_parser("answer", help="answer eval: generate and judge answers")
     common(an)

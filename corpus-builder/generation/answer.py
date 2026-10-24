@@ -14,6 +14,7 @@ Generators:
   claude      single shot: an LLM answers from the top k passages (needs ANTHROPIC_API_KEY)
   extractive  single shot, no LLM: the sentence of the top k passages that best overlaps the
               question. A floor for comparison, and a way to try the pipeline without a key.
+  agent       Claude searches and reads with tools, in a loop, until it can answer (agent.py)
 
 To add one: subclass Generator (or SingleShotGenerator), add it to GENERATORS and get_generator.
 """
@@ -57,7 +58,7 @@ class Answer:
     passages: list[dict]                      # every passage it saw: [{chunk_id, rank, score, step}]
     generator: dict
     prompt_version: str | None = None
-    input_tokens: int = 0
+    input_tokens: int = 0                     # over all LLM calls, including prompt-cache reads
     output_tokens: int = 0
     cost: float | None = 0.0
     seconds: float = 0.0
@@ -65,6 +66,7 @@ class Answer:
     raw: str | None = None
     warnings: list[str] = field(default_factory=list)
     trace: list[dict] = field(default_factory=list)  # one entry per step, see Trace
+    cache_read_tokens: int = 0                # input tokens served from the provider's prompt cache
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -95,6 +97,7 @@ class Trace:
         step = {"step": len(self.steps) + 1, "action": action, "input": input, "chunks": list(chunks or []),
                 "input_tokens": response.input_tokens if response else 0,
                 "output_tokens": response.output_tokens if response else 0,
+                "cache_read_tokens": response.cache_read_tokens if response else 0,
                 "seconds": round(seconds if seconds is not None else (response.seconds if response else 0.0), 3),
                 **extra}
         self.steps.append(step)
@@ -138,6 +141,7 @@ def finish_answer(question: str, text: str, answerable: bool, trace: Trace, gene
         cost=None if any(c is None for c in costs) else sum(costs),
         seconds=round(time.perf_counter() - trace.t0, 3), cached=bool(rs) and all(r.cached for r in rs),
         raw=rs[-1].text if rs else None, warnings=warnings, trace=trace.steps,
+        cache_read_tokens=sum(r.cache_read_tokens for r in rs),
     )
 
 
@@ -227,7 +231,9 @@ class ExtractiveGenerator(SingleShotGenerator):
         return f"{best[0]} [{best[1]}]", True, None, []
 
 
-GENERATORS = {"claude": LLMGenerator, "extractive": ExtractiveGenerator}
+GENERATORS = {"claude": "single shot: Claude answers from the top k passages",
+              "extractive": "single shot, no LLM: best-overlapping sentence (baseline)",
+              "agent": "Claude searches and reads with tools until it can answer"}
 
 
 def available_generators() -> list[str]:
@@ -235,11 +241,15 @@ def available_generators() -> list[str]:
 
 
 def get_generator(name: str, model: str = DEFAULT_MODEL, cache_dir: Path | None = None,
-                  api_key: str | None = None, llm: LLM | None = None) -> Generator:
+                  api_key: str | None = None, llm: LLM | None = None, **options) -> Generator:
+    """`options` go to the generator, e.g. max_turns=4 or tools=("search",) for the agent."""
     if name == "extractive":
-        return ExtractiveGenerator()
+        return ExtractiveGenerator(**options)
     if name == "claude":
-        return LLMGenerator(llm or make_llm(model, cache_dir, api_key))
+        return LLMGenerator(llm or make_llm(model, cache_dir, api_key), **options)
+    if name == "agent":
+        from .agent import AgentGenerator
+        return AgentGenerator(llm or make_llm(model, cache_dir, api_key), **options)
     raise ValueError(f"Unknown generator {name!r}. Available: {', '.join(available_generators())}")
 
 

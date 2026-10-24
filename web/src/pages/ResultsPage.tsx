@@ -56,7 +56,7 @@ function RunEvalPanel() {
   const [chunks, setChunks] = useState<string>("");
   const [retriever, setRetriever] = useState("bm25");
   const [split, setSplit] = useState<"dev" | "test" | "all">("dev");
-  const [generator, setGenerator] = useState<"claude" | "extractive">("claude");
+  const [generator, setGenerator] = useState<"claude" | "agent" | "extractive">("claude");
   const [model, setModel] = useState("");
   const [judge, setJudge] = useState("same");
   const [k, setK] = useState(8);
@@ -67,8 +67,9 @@ function RunEvalPanel() {
   const fileErrors = questions.data?.errors.length ?? 0;
   const models = llm.data?.models ?? [];
   const genModel = model || llm.data?.default_model || "";
-  const judgeModel = judge === "same" ? (generator === "claude" ? genModel : llm.data?.default_model ?? "") : judge;
-  const needsKey = kind === "answer" && !llm.data?.configured && (generator === "claude" || judgeModel !== "none");
+  const usesModel = generator !== "extractive";
+  const judgeModel = judge === "same" ? (usesModel ? genModel : llm.data?.default_model ?? "") : judge;
+  const needsKey = kind === "answer" && !llm.data?.configured && (usesModel || judgeModel !== "none");
 
   const finished = useCallback(
     (name: string) => {
@@ -84,7 +85,7 @@ function RunEvalPanel() {
     const body =
       kind === "retrieval"
         ? { kind, chunks: chosen, retriever, split }
-        : { kind, chunks: chosen, retriever, split, generator, model: generator === "claude" ? genModel : undefined, judge: judgeModel, k };
+        : { kind, chunks: chosen, retriever, split, generator, model: usesModel ? genModel : undefined, judge: judgeModel, k };
     start.mutate(body, {
       onSuccess: (r) => {
         if (r.job) setJobId(r.job.id);
@@ -148,27 +149,34 @@ function RunEvalPanel() {
             <span>Answered by</span>
             <select
               className="select"
-              value={generator === "extractive" ? "extractive" : genModel}
+              value={generator === "extractive" ? "extractive" : `${generator}:${genModel}`}
               onChange={(e) => {
-                if (e.target.value === "extractive") setGenerator("extractive");
-                else {
-                  setGenerator("claude");
-                  setModel(e.target.value);
-                }
+                const [g, m] = e.target.value.split(":");
+                setGenerator(g as "claude" | "agent" | "extractive");
+                if (m) setModel(m);
               }}
             >
-              {models.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
+              <optgroup label="Single shot: one search, then answer">
+                {models.map((m) => (
+                  <option key={m} value={`claude:${m}`}>
+                    {m}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Agent: searches and reads until it can answer">
+                {models.map((m) => (
+                  <option key={m} value={`agent:${m}`}>
+                    agent, {m}
+                  </option>
+                ))}
+              </optgroup>
               <option value="extractive">Extractive baseline (no model)</option>
             </select>
           </label>
           <label className="inline-field">
             <span>Judge</span>
             <select className="select" value={judge} onChange={(e) => setJudge(e.target.value)}>
-              <option value="same">{generator === "claude" ? `Same model (${genModel})` : `Default (${llm.data?.default_model ?? ""})`}</option>
+              <option value="same">{usesModel ? `Same model (${genModel})` : `Default (${llm.data?.default_model ?? ""})`}</option>
               {models.map((m) => (
                 <option key={m} value={m}>
                   {m}
@@ -178,7 +186,7 @@ function RunEvalPanel() {
             </select>
           </label>
           <label className="inline-field">
-            <span>Passages</span>
+            <span>{generator === "agent" ? "Passages per search" : "Passages"}</span>
             <select className="select" value={k} onChange={(e) => setK(Number(e.target.value))}>
               {[3, 5, 8, 12, 20].map((x) => (
                 <option key={x} value={x}>
@@ -192,7 +200,9 @@ function RunEvalPanel() {
       <div className="row" style={{ marginTop: 12 }}>
         {kind === "answer" && (
           <span className="xs muted" style={{ maxWidth: "62ch" }}>
-            One generation and up to two judge calls per question. Answers are cached, so rerunning the same setup is free.
+            {generator === "agent"
+              ? "The agent makes several model calls per question (8 at most). Answers are cached, so rerunning the same setup is free."
+              : "One generation and up to two judge calls per question. Answers are cached, so rerunning the same setup is free."}
           </span>
         )}
         <span className="spacer" />
@@ -279,7 +289,7 @@ export function ResultsPage() {
                     </td>
                     <td className="small">
                       <span className={`pill ${r.kind === "answer" ? "accent" : ""}`}>{r.kind === "answer" ? "Answers" : "Retrieval"}</span>{" "}
-                      {r.kind === "answer" && <>{r.generator?.model ?? "extractive"}, </>}
+                      {r.kind === "answer" && <>{r.generator?.name === "agent" ? `agent (${r.generator.model})` : r.generator?.model ?? "extractive"}, </>}
                       {r.retriever?.name} on {r.chunks}
                       {r.git_commit && <div className="xs muted">commit {r.git_commit}</div>}
                     </td>

@@ -61,6 +61,157 @@ The chunk run (e.g. `pymupdf_w400_o60`) is picked in the sidebar; evidence check
 
 **Saving is safe to mix with a text editor.** Every save is validated with the same rules as `evaluate.py check`, written atomically, and refused if `questions.yaml` changed since the app loaded it. You then get a "Reload file" button, and your unsaved form edits are kept. The comment block at the top of the file is preserved; comments *inside* questions are not, so use the `notes` field.
 
+## How answering works: single shot and the agent
+
+There are three generators, chosen with `--generator` on the command line (and in the app):
+
+| Generator | What it does | Needs a key |
+|---|---|---|
+| `extractive` | Searches once with the question and returns the best-overlapping sentence. The floor. | no |
+| `claude` | Searches once with the question and gives the top k passages to Claude, which answers from them. | yes |
+| `agent` | Claude decides what to search and read, in a loop, until it can answer. | yes |
+
+Single shot has one weakness the agent is built for: the question is the only search. If the question uses different words than the paper ("rotational symmetry" vs "E(3)-equivariant"), or needs two facts where the second depends on the first ("which cutoff does the model that introduced continuous-filter convolutions use?"), one search can't find everything, and no prompt fixes a passage that was never retrieved.
+
+### The loop
+
+```
+                 question
+                    │
+                    ▼
+     ┌─────────────────────────────┐
+     │ Claude                      │◄────────────────────────────────┐
+     │  system prompt (how to work)│                                 │
+     │  tools (what it can do)     │                                 │
+     │  the conversation so far    │                                 │
+     └──────────────┬──────────────┘                                 │
+                    │ one or more tool calls                         │
+     ┌──────────────┼──────────────────┬──────────────────┐          │
+     ▼              ▼                  ▼                  ▼          │
+  search        read_around        open_paper        give_up, or a   │
+  (query,       (passage id,       (paper id)        reply with no   │
+   k, paper,     before, after)                      tool call       │
+   year_from)                                             ▼          │
+     │              │                  │            Answer + trace   │
+     └──────────────┴────────┬─────────┘                             │
+                             ▼                                       │
+              Library: BM25 index, chunks in reading                 │
+              order, paper outlines                                  │
+                             │                                       │
+                             ▼                                       │
+              tool results (passages with their ids) ────────────────┘
+              added to the conversation; budgets checked
+```
+
+Each turn, Claude sees the whole conversation so far and either calls tools or finishes:
+
+1. **The question goes in** with a system prompt (`generation/prompts.py`, versioned as `agent-v2`) that explains the tools and the rules. The rules are the same as single shot: answer only from passages it has read, cite every claim as `[chunk_id]`, give up rather than guess.
+2. **Claude calls tools.** It can call several in one turn, for example opening a paper and reading around a passage at once. Each call runs against the `Library` (`corpus-builder/generation/tools.py`) and the results go back as passages with their ids.
+3. **Repeat** until Claude replies without calling a tool (that reply is the answer) or calls `give_up`.
+4. **Check the answer.** Its citations are checked against every passage it actually read; an id it never saw counts as an invalid citation, exactly as in single shot.
+
+| Tool | What it returns | Typical use |
+|---|---|---|
+| `search(query, k, paper_id, year_from)` | the top k passages for a keyword query, optionally within one paper or from a year on | rephrasing with the paper's vocabulary; the second hop of a multi-hop question; looking inside one paper |
+| `read_around(chunk_id, before, after)` | the neighbouring passages of the same paper, in reading order | a passage cut off mid-argument; the definitions around an equation |
+| `open_paper(paper_id)` | title, authors, year, abstract, and the list of sections with their first passage | finding where in a paper to look |
+| `give_up(reason)` | ends the loop without an answer | the papers don't cover the question |
+
+**Budgets keep it bounded.** `max_turns` (default 8 model calls) and `token_budget` (default 100,000 tokens over all turns). When either runs out, the last turn offers only `give_up`, with a note to answer now, so every question ends with an answer or an explicit give-up.
+
+**Cost.** Every turn re-sends the conversation, so it grows. Three things keep that cheap:
+- A passage is shown in full only once; when a later search returns it again, only its id and heading are repeated.
+- Prompt caching is on, so the repeated part of each turn is billed at a fraction of the input price (5% on Sonnet and Opus 5.5, 10% on Haiku).
+- Every request is cached on disk, so rerunning an eval costs nothing.
+
+Expect most questions to take 2–4 turns and a few thousand to a few tens of thousands of input tokens, most of them cache reads; the exact tokens and cost of every answer are recorded, so the first real eval run will tell.
+
+**The trace.** Every step is recorded: the tool, its arguments, which passages came back and how many were new, tokens, time, and Claude's own short note on what it is doing. `evaluate.py ask --generator agent` prints it (numbers here are illustrative):
+
+```
+Steps:
+   1. search      "NequIP radial cutoff" (k=5) -> 5 passages, 5 new   [2,310 in / 61 out, 2.1s]
+      | Let me find NequIP's cutoff first.
+   2. search      "SchNet cosine cutoff" (k=5) -> 5 passages, 3 new   [5,020 in / 58 out (2,280 cached), 1.8s]
+      | Now SchNet's.
+   3. answer      [7,650 in / 95 out (4,990 cached), 2.4s]
+```
+
+Answer runs save the trace of every question in `per_question.jsonl`.
+
+**How it is evaluated.** Exactly like single shot, with `evaluate.py answer --generator agent` (or **Answers** on the Results tab, picking an "agent" model): same questions, same judge, same metrics. Differences from single shot:
+- "Evidence retrieved" means the evidence was among *any* passage the agent read, not just the first search.
+- Each question also records its effort: model calls, tool calls, searches, passages read, tokens, cost, time, and whether it gave up or ran out of budget. The run page and the report show the averages.
+
+### Comparing the agent with single shot
+
+Run both on the same questions, select the two runs on the Results tab and press Compare (or `python evaluate.py compare ../data/runs/<single> ../data/runs/<agent>`). Besides each run's means, Compare shows:
+
+- **A paired comparison**, question by question. For every metric:
+  - the mean difference with a paired bootstrap 95% interval
+  - how many questions got better, worse or stayed the same
+  - an exact sign test on better vs worse
+  - which questions moved, linked to the questions
+- **Effort per question** side by side: what the extra correctness cost in calls, tokens, dollars and seconds.
+
+Why paired: with 20–60 questions, two runs' separate intervals overlap for almost any difference. But both runs answered the same questions, and most of the variation is shared (some questions are just hard), so differences per question are far less noisy. If the agent fixes 6 questions and breaks none, that is clear (p = 0.03) even when the two means' intervals overlap.
+
+Where to look first: the `type:multihop` and `type:comparison` groups, and the `retrieval:missed` group of the single-shot run, which are the questions one search couldn't serve.
+
+**Running it.**
+
+```bash
+cd corpus-builder
+python evaluate.py ask --generator agent "How does NequIP's cutoff compare to SchNet's?"
+python evaluate.py ask --generator agent --model claude-haiku-5-5 --max-turns 4 "..."
+python evaluate.py ask --generator agent --tools search "..."        # ablation: search only
+python evaluate.py answer --generator agent --judge claude-sonnet-5-5  # the answer eval
+```
+
+**Extending it.** A new tool is a `Tool` subclass in `generation/tools.py` (name, description, JSON schema, and a `run` that uses the `Library`) plus one line in `TOOLS`; turn it on with `--tools`. Planned next:
+- `find_papers`, a search over titles and abstracts that returns papers rather than passages
+- `citations`, which follows references and citing papers within the corpus, once the corpus builder saves the citation graph
+
+## Design choices
+
+The decisions that shape the project, and why. Each one is something you could reasonably do differently.
+
+**Corpus and data**
+- *A citation-graph corpus, not a keyword crawl.* Seeds plus one backward and one forward citation hop (`corpus_builder.py`) give a field-shaped corpus: the papers the seeds build on and the work that builds on them. It's small enough to read the eval results by hand and real enough that retrieval is not trivial.
+- *Free full texts only, abstracts otherwise, and manual additions on top.* Nothing goes through paywalls. Papers you add by hand are recorded in `manual.jsonl` and re-applied on every rebuild, so they survive regenerating the corpus.
+- *Code and data are separate* (`corpus-builder/` vs `data/`). Paths come from one place (`paths.py`, `server/app/config.py`), and every part can be moved with an environment variable.
+
+**Parsing and chunking**
+- *Parsers are pluggable, and outputs never overwrite each other.* Each parser + chunk setting writes its own folder (`data/chunks/pymupdf_w400_o60/`), so two parsers or two chunk sizes can be run through the same eval and compared.
+- *PyMuPDF first, with heuristics for scientific PDFs* (running headers, section numbering, references dropped). Equations are the known weak spot. The `equation` tag in the questions exists to measure how much that costs before paying for a heavier parser.
+
+**Retrieval evaluation**
+- *Evidence is a quote, not a chunk id.* Questions point to a paper and a sentence; the eval finds the chunk that contains it (word-trigram overlap). Gold labels therefore survive re-chunking and parser changes, which chunk ids would not.
+- *Strict and lenient scores.* Another paper often says the same thing as your evidence. Rather than counting that as a miss or silently accepting it, you mark such passages as alternatives, and both scores are reported. "Judged@10" says how much of each top 10 you have reviewed, i.e. how far the lenient score can be trusted.
+- *Every number has a 95% bootstrap interval*, because with tens of questions the uncertainty is the main fact about a result.
+
+**Answers and their evaluation**
+- *The same rules for every generator*: answer only from passages read, cite each claim as `[chunk_id]`, decline rather than guess, 1–4 sentences of plain prose. Comparisons then measure retrieval and reasoning, not prompt style.
+- *Citations are checked mechanically* against the passages the generator actually saw; a made-up id is counted, not trusted.
+- *Separate metrics instead of one score*: correct (against your reference), supported (by what it cites), cites your evidence, evidence retrieved, invalid citations, and declining when it should and shouldn't. Each failure mode then shows up on its own line. The `retrieval:found` / `retrieval:missed` split separates retrieval failures from generation failures.
+- *An LLM judge, validated against you.* Correctness and support need judgment, so an LLM grades them. Its verdicts are only worth reporting next to how often it agrees with yours: grade answers on a run page, and the app shows agreement and Cohen's κ.
+- *A no-LLM baseline.* The extractive generator is the floor every model has to beat, and lets everything be run and tested without a key.
+- *Paired comparisons between runs*: the sign test and paired bootstrap described above, because with a small question set they are what can show a real difference.
+- *Effort is measured with correctness.* Calls, tokens, cost and time are recorded per question, so "better" always comes with "at what price".
+
+**The agent**
+- *A hand-written loop, not a framework.* About 100 lines (`generation/agent.py`) on the Messages API's tool use. Every step is visible, the loop is tested offline with a scripted model (`tests/test_agent.py`), and the output is the same `Answer` as single shot, so the evals don't care which generator produced it. A LangGraph version would make a good comparison later.
+- *Tools are thin wrappers over `Library`*, the single object that the CLI, server, evals and generators all use to read the corpus. A tool can't see the corpus differently from the eval that scores it.
+- *A plain reply is the answer; `give_up` is a tool.* The first version had an `answer` tool too, but in the first real run Haiku wrote its answer as text instead of calling it. Ending on a reply without tool calls is how Claude naturally finishes, so the agent now accepts that as the answer. Declining stays an explicit tool call, so the eval can score it. A text reply that refuses without citations still counts as declining.
+- *Same passages per search as single shot.* A search returns `k` passages by default, the same `k` single shot gets, and the tool description states that default. In the first real run Haiku asked for 5 because an earlier description said "default 5". The model may still ask for fewer or more (up to 10), and the trace records what it chose.
+- *Bounded by budgets, not trust.* Turns and tokens are capped. On the last turn only `give_up` is offered, so every question ends in an answer or an explicit give-up.
+- *Built to be cheap to run.* Passages are shown in full only once. Prompt caching bills the repeated conversation at 5–10% of the input price. Every request is cached on disk, so rerunning an eval is free and gives the same answers.
+- *Prompts are versioned* (`agent-v2`, `answer-v1`, `judge-v1`) and stored with every run, so results from different prompts are never mixed up silently.
+
+**Software**
+- *The core is a library with a CLI; the server is a thin layer over it.* The app and `evaluate.py` run the same functions and write the same folders, so terminal runs and app runs are interchangeable.
+- *Everything model-related is cached and testable offline.* A scripted model stands in for Claude in the tests, including tool calls.
+
 ## Working on the UI
 
 ```bash
@@ -87,9 +238,9 @@ web (React)  --/api-->  server/app/routers  -->  server/app/services  -->  corpu
                         ask, evals               jobs
 ```
 
-- **`corpus-builder/library.py`** is the one way to read a chunk run: `search` (with `paper`, `year_from`/`year_to`, `exclude` filters), `chunk`, `neighbours`, `paper` (title, year, section outline), `section_chunks`. The CLI, the evals, the server (each cached chunk run is a `Library`) and the generators all use it, so they see the corpus the same way. The agent's tools will be thin wrappers over these methods.
+- **`corpus-builder/library.py`** is the one way to read a chunk run: `search` (with `paper`, `year_from`/`year_to`, `exclude` filters), `chunk`, `neighbours`, `paper` (title, year, section outline), `section_chunks`. The CLI, the evals, the server (each cached chunk run is a `Library`) and the generators all use it, so they see the corpus the same way. The agent's tools are thin wrappers over these methods.
 - **Routers** only translate HTTP; **services** hold the logic and caches (chunk runs and retriever indexes are loaded once and reloaded when their files change); the **core** stays usable from the command line.
 - **Adding a retriever** (dense, hybrid, rerank): a new file in `corpus-builder/retrieval/` plus one registry line. It then shows up in `evaluate.py`, in `/api/search?retriever=...` and in `/api/meta`.
-- **Generation** lives in `corpus-builder/generation/`: `llm.py` (the Anthropic client, the on-disk cache, prices), `prompts.py` (versioned prompts; the version is recorded in every run) and `answer.py` (generators). Generators get the question and the `Library` and decide what to read; every answer carries a step-by-step `trace` and the list of passages it saw, and its citations are checked against those. The LLM layer has `complete` (one prompt) and `chat` (a conversation with tool use), both cached. A new generator, e.g. the agentic loop, is a `Generator` subclass plus one registry line, and then shows up in `evaluate.py`, the Ask page and the answer eval.
+- **Generation** lives in `corpus-builder/generation/`: `llm.py` (the Anthropic client, the on-disk cache, prices), `prompts.py` (versioned prompts; the version is recorded in every run), `answer.py` (the generator interface and the single-shot generators), `agent.py` (the agent loop) and `tools.py` (the agent's tools). Generators get the question and the `Library` and decide what to read; every answer carries a step-by-step `trace` and the list of passages it saw, and its citations are checked against those. The LLM layer has `complete` (one prompt) and `chat` (a conversation with tool use), both cached. A new generator is a `Generator` subclass plus one registry line, and then shows up in `evaluate.py`, the Ask page and the answer eval.
 - **Long jobs** (answer evals) run in a background thread (`services/jobs.py`) and the UI polls `/api/jobs/{id}`.
 - **Paths** default to the layout above. `LITRAG_DATA` moves the whole data folder; `LITRAG_CORPUS`, `LITRAG_CHUNKS`, `LITRAG_QUESTIONS`, `LITRAG_RUNS`, `LITRAG_CACHE`, `LITRAG_CORE` and `LITRAG_WEB_DIST` move single parts. The command-line tools find `data/` from any working directory.

@@ -1545,3 +1545,11 @@ a.cite:hover {
     margin-left: 0;
   }
 }
+.diff-up {
+  color: var(--ok);
+  font-weight: 600;
+}
+.diff-down {
+  color: var(--warn);
+  font-weight: 600;
+}

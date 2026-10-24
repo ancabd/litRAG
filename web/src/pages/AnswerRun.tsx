@@ -156,7 +156,9 @@ export function AnswerRun({ r }: { r: EvalDetail }) {
         <div>
           <h1>Answer eval, {when(r.created)}</h1>
           <p className="sub">
-            {r.generator?.model ?? "Extractive baseline"} answering from the top {r.k} passages of {r.retriever?.name} on {r.chunks},{" "}
+            {r.generator?.name === "agent"
+              ? `Agent (${r.generator.model}) searching ${r.retriever?.name} on ${r.chunks}, ${r.k} passages per search,`
+              : `${r.generator?.model ?? "Extractive baseline"} answering from the top ${r.k} passages of ${r.retriever?.name} on ${r.chunks},`}{" "}
             {r.split ?? "all"} split, {r.n_scored} questions.{" "}
             {r.judge ? `Judged by ${r.judge.model}.` : "No judge, so only the citation metrics are scored."}
             {cost > 0 && ` Cost $${cost.toFixed(3)}.`}
@@ -164,6 +166,18 @@ export function AnswerRun({ r }: { r: EvalDetail }) {
         </div>
       </div>
 
+      {r.effort && r.effort.turns != null && (
+        <p className="small" style={{ margin: "0 0 12px" }}>
+          Per question on average: {r.effort.turns.toFixed(1)} model call{r.effort.turns === 1 ? "" : "s"}
+          {r.effort.searches != null && `, ${r.effort.searches.toFixed(1)} searches`}
+          {r.effort.passages_read != null && `, ${r.effort.passages_read.toFixed(1)} passages read`}
+          {r.effort.input_tokens != null && `, ${Math.round(r.effort.input_tokens).toLocaleString()} input tokens`}
+          {r.effort.cost != null && r.effort.cost > 0 && `, $${r.effort.cost.toFixed(4)}`}
+          {r.effort.seconds != null && `, ${r.effort.seconds.toFixed(1)} s`}.
+          {r.effort.gave_up > 0 && ` Gave up on ${Math.round(r.effort.gave_up * 100)}%.`}
+          {r.effort.hit_budget > 0 && ` Ran out of budget on ${Math.round(r.effort.hit_budget * 100)}%.`}
+        </p>
+      )}
       <ScoreChart results={all} metrics={METRICS} strictLabel={null} />
       <p className="xs muted" style={{ marginTop: 6, maxWidth: "80ch" }}>
         Correct is the judge's grade against your reference (partial counts half). Supported asks whether the cited passages back the
