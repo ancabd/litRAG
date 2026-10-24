@@ -1,7 +1,16 @@
 """A minimal LLM interface, one provider (Anthropic), and an on-disk response cache.
 
-Everything that calls a model (answering, judging, later the agent) goes through `LLM.complete`,
-so swapping providers or models is one class, and every call is cached and accounted for.
+Everything that calls a model goes through one of two methods, so swapping providers or models is
+one class, and every call is cached and accounted for:
+
+  complete(system, prompt)              one prompt in, text out (answering, judging)
+  chat(system, messages, tools)         a conversation with tool use (the agent)
+
+Messages and content blocks use the Anthropic shape, as plain dicts:
+  {"role": "user" | "assistant", "content": str | [blocks]}
+  blocks: {"type": "text", "text"} | {"type": "tool_use", "id", "name", "input"}
+          | {"type": "tool_result", "tool_use_id", "content", "is_error"?}
+Tools: {"name", "description", "input_schema": <JSON schema>}.
 """
 from __future__ import annotations
 
@@ -10,7 +19,7 @@ import json
 import os
 import time
 from abc import ABC, abstractmethod
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 # $ per million tokens (input, output), from the Claude models overview. Used for cost estimates only.
@@ -32,6 +41,13 @@ class LLMError(RuntimeError):
 
 
 @dataclass
+class ToolCall:
+    id: str
+    name: str
+    input: dict
+
+
+@dataclass
 class LLMResponse:
     text: str
     model: str
@@ -39,6 +55,15 @@ class LLMResponse:
     output_tokens: int = 0
     seconds: float = 0.0
     cached: bool = False
+    # chat() only: the assistant turn as content blocks (append it to the messages to continue),
+    # the tool calls in it, and why the model stopped ("end_turn", "tool_use", "max_tokens", ...)
+    content: list[dict] = field(default_factory=list)
+    tool_calls: list[ToolCall] = field(default_factory=list)
+    stop_reason: str | None = None
+
+    def message(self) -> dict:
+        """This response as an assistant message, to append to the conversation."""
+        return {"role": "assistant", "content": self.content or [{"type": "text", "text": self.text}]}
 
     @property
     def cost(self) -> float | None:
@@ -58,8 +83,27 @@ class LLM(ABC):
     def complete(self, system: str, prompt: str, max_tokens: int = 1024) -> LLMResponse:
         ...
 
+    def chat(self, system: str, messages: list[dict], tools: list[dict] | None = None,
+             max_tokens: int = 1024) -> LLMResponse:
+        raise NotImplementedError(f"{type(self).__name__} does not support tool use")
+
     def config(self) -> dict:
         return {"provider": self.provider, "model": self.model}
+
+
+def _block(b) -> dict:
+    """An SDK content block as a plain dict (only the fields that are sent back)."""
+    if b.type == "text":
+        return {"type": "text", "text": b.text}
+    if b.type == "tool_use":
+        return {"type": "tool_use", "id": b.id, "name": b.name, "input": dict(b.input or {})}
+    return b.model_dump(exclude_none=True) if hasattr(b, "model_dump") else {"type": b.type}
+
+
+def _from_blocks(blocks: list[dict]) -> tuple[str, list[ToolCall]]:
+    text = "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
+    calls = [ToolCall(b["id"], b["name"], b.get("input") or {}) for b in blocks if b.get("type") == "tool_use"]
+    return text, calls
 
 
 class AnthropicLLM(LLM):
@@ -89,6 +133,21 @@ class AnthropicLLM(LLM):
         return LLMResponse(text=text, model=self.model, input_tokens=msg.usage.input_tokens,
                            output_tokens=msg.usage.output_tokens, seconds=time.perf_counter() - t0)
 
+    def chat(self, system: str, messages: list[dict], tools: list[dict] | None = None,
+             max_tokens: int = 1024) -> LLMResponse:
+        t0 = time.perf_counter()
+        kwargs = {"tools": tools} if tools else {}
+        try:
+            msg = self.client.messages.create(model=self.model, max_tokens=max_tokens, system=system,
+                                              messages=messages, **kwargs)
+        except self._anthropic.APIError as exc:
+            raise LLMError(f"Anthropic API error: {exc}") from exc
+        content = [_block(b) for b in msg.content]
+        text, calls = _from_blocks(content)
+        return LLMResponse(text=text, model=self.model, input_tokens=msg.usage.input_tokens,
+                           output_tokens=msg.usage.output_tokens, seconds=time.perf_counter() - t0,
+                           content=content, tool_calls=calls, stop_reason=msg.stop_reason)
+
 
 class CachedLLM(LLM):
     """Wraps an LLM; identical requests (model + prompts + max_tokens) are answered from disk.
@@ -106,18 +165,38 @@ class CachedLLM(LLM):
         key = json.dumps([self.inner.provider, self.inner.model, system, prompt, max_tokens])
         return self.cache_dir / f"{hashlib.sha256(key.encode()).hexdigest()[:32]}.json"
 
-    def complete(self, system: str, prompt: str, max_tokens: int = 1024) -> LLMResponse:
-        path = self._path(system, prompt, max_tokens)
-        if path.exists():
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-                return LLMResponse(**{**data, "cached": True, "seconds": 0.0})
-            except (ValueError, TypeError):
-                pass  # corrupt cache entry: fetch again
-        r = self.inner.complete(system, prompt, max_tokens)
+    def _get(self, path: Path) -> LLMResponse | None:
+        if not path.exists():
+            return None
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["tool_calls"] = [ToolCall(**t) for t in data.get("tool_calls") or []]
+            return LLMResponse(**{**data, "cached": True, "seconds": 0.0})
+        except (ValueError, TypeError):
+            return None  # corrupt cache entry: fetch again
+
+    def _put(self, path: Path, r: LLMResponse) -> None:
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(asdict(r)), encoding="utf-8")
         tmp.replace(path)
+
+    def complete(self, system: str, prompt: str, max_tokens: int = 1024) -> LLMResponse:
+        path = self._path(system, prompt, max_tokens)
+        r = self._get(path)
+        if r is None:
+            r = self.inner.complete(system, prompt, max_tokens)
+            self._put(path, r)
+        return r
+
+    def chat(self, system: str, messages: list[dict], tools: list[dict] | None = None,
+             max_tokens: int = 1024) -> LLMResponse:
+        key = json.dumps(["chat", self.inner.provider, self.inner.model, system, messages, tools, max_tokens],
+                         sort_keys=True)
+        path = self.cache_dir / f"{hashlib.sha256(key.encode()).hexdigest()[:32]}.json"
+        r = self._get(path)
+        if r is None:
+            r = self.inner.chat(system, messages, tools, max_tokens)
+            self._put(path, r)
         return r
 
     def config(self) -> dict:
@@ -125,19 +204,41 @@ class CachedLLM(LLM):
 
 
 class ScriptedLLM(LLM):
-    """For tests: returns responses from a function of (system, prompt). No network."""
+    """For tests: no network.
+
+    complete(): `respond(system, prompt)` returns the text.
+    chat():     `chat_respond(system, messages, tools)` returns a string (a final text answer), or
+                {"text": ..., "tool_calls": [{"name": ..., "input": {...}}, ...]}; ids are generated.
+    """
 
     provider = "scripted"
 
-    def __init__(self, respond, model: str = "scripted"):
+    def __init__(self, respond=None, model: str = "scripted", chat_respond=None):
         super().__init__(model)
-        self.respond = respond
+        self.respond, self.chat_respond = respond, chat_respond
         self.calls: list[tuple[str, str]] = []
+        self.chats: list[list[dict]] = []
 
     def complete(self, system: str, prompt: str, max_tokens: int = 1024) -> LLMResponse:
         self.calls.append((system, prompt))
         return LLMResponse(text=self.respond(system, prompt), model=self.model, input_tokens=len(prompt) // 4,
                            output_tokens=50)
+
+    def chat(self, system: str, messages: list[dict], tools: list[dict] | None = None,
+             max_tokens: int = 1024) -> LLMResponse:
+        if self.chat_respond is None:
+            raise NotImplementedError("ScriptedLLM was created without chat_respond")
+        self.chats.append(json.loads(json.dumps(messages)))
+        out = self.chat_respond(system, messages, tools)
+        out = {"text": out} if isinstance(out, str) else out
+        n = len(self.chats)
+        content = [{"type": "text", "text": out["text"]}] if out.get("text") else []
+        content += [{"type": "tool_use", "id": f"toolu_{n:03d}_{i}", "name": t["name"], "input": t.get("input") or {}}
+                    for i, t in enumerate(out.get("tool_calls") or [])]
+        text, calls = _from_blocks(content)
+        size = len(json.dumps(messages)) // 4
+        return LLMResponse(text=text, model=self.model, input_tokens=size, output_tokens=50, content=content,
+                           tool_calls=calls, stop_reason="tool_use" if calls else "end_turn")
 
 
 def make_llm(model: str = DEFAULT_MODEL, cache_dir: Path | None = None, api_key: str | None = None) -> LLM:

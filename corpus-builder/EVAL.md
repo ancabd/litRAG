@@ -109,7 +109,21 @@ Answer runs go in `data/runs/` next to retrieval runs (`report.md` lists every a
 
 ## Adding a generator
 
-`generation/answer.py` has the `Generator` interface: `generate(question, passages)` returns the answer text, whether it's answerable, the LLM response (for usage) and any warnings; `answer_question` wraps it, extracts and checks the citations, and returns an `Answer`. Add a subclass and one line to `GENERATORS`, and it can be used from `evaluate.py --generator`, the Ask page and the answer eval. An agentic generator (one that rewrites the query, searches again, or reads more of a paper before answering) also needs the retriever, so it will extend this interface to receive it and decide itself what to fetch.
+A generator gets the question and the `Library` (see `library.py`) and returns an `Answer`:
+
+```python
+class MyGenerator(Generator):
+    name = "mine"
+    def answer(self, question, library, k=8, retriever="bm25", on_step=None) -> Answer:
+        trace = Trace(on_step)
+        hits = library.search(question, k=k, retriever=retriever)
+        trace.saw(hits)                                   # passages it may cite
+        trace.add("search", {"query": question}, [h.chunk_id for h in hits])
+        ...                                               # read more, call an LLM (trace.add(..., response=r))
+        return finish_answer(question, text, answerable, trace, self)
+```
+
+`finish_answer` checks the citations against everything the trace saw and adds up tokens and cost over all LLM calls. A generator that searches once and answers can subclass `SingleShotGenerator` and only implement `generate(question, passages)`. Add it to `GENERATORS` and `get_generator` in `generation/answer.py`, and it can be used from `evaluate.py --generator`, the Ask page and the answer eval. For tool use, `llm.chat(system, messages, tools)` returns the text, the tool calls and the assistant message to append; it's cached like `complete`.
 
 ## Adding a retriever
 

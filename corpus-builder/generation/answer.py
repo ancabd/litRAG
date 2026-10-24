@@ -1,13 +1,21 @@
-"""Answer a question from retrieved passages, with citations.
+"""Answer a question from the corpus, with citations.
 
+    lib = Library.load(paths.default_chunk_run())
     generator = get_generator("claude", model="claude-sonnet-5-5", cache_dir=paths.CACHE / "llm")
-    ans = answer_question("What test system ...?", retriever, chunks_by_id, generator, k=8)
-    ans.answer, ans.citations, ans.answerable
+    ans = generator.answer("What test system ...?", lib, k=8)      # or answer_question(...)
+    ans.answer, ans.citations, ans.answerable, ans.trace
+
+A generator gets the question and the Library, and decides itself what to read. Single-shot
+generators search once and answer from the top k passages; an agent can search, read and
+search again. Either way the result is an Answer whose `passages` are every passage the
+generator saw, and whose citations are checked against them.
 
 Generators:
-  claude      an LLM answers from the passages (needs ANTHROPIC_API_KEY)
-  extractive  no LLM: returns the sentence of the retrieved passages that best overlaps the
+  claude      single shot: an LLM answers from the top k passages (needs ANTHROPIC_API_KEY)
+  extractive  single shot, no LLM: the sentence of the top k passages that best overlaps the
               question. A floor for comparison, and a way to try the pipeline without a key.
+
+To add one: subclass Generator (or SingleShotGenerator), add it to GENERATORS and get_generator.
 """
 from __future__ import annotations
 
@@ -16,9 +24,13 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING, Callable
 
 from .llm import DEFAULT_MODEL, LLM, LLMResponse, make_llm, parse_json
 from .prompts import ANSWER_SYSTEM, ANSWER_VERSION, answer_prompt
+
+if TYPE_CHECKING:
+    from library import Library
 
 CHUNK_ID = re.compile(r"^[A-Za-z0-9]+#\d{3,}$")
 BRACKETS = re.compile(r"\[([^\[\]]{3,200})\]")
@@ -40,9 +52,9 @@ class Answer:
     question: str
     answer: str
     answerable: bool
-    citations: list[str]                      # cited chunk ids that were among the passages
-    invalid_citations: list[str]              # cited ids that were NOT given (made up)
-    passages: list[dict]                      # [{chunk_id, rank, score}] given to the generator
+    citations: list[str]                      # cited chunk ids that the generator had seen
+    invalid_citations: list[str]              # cited ids it never saw (made up)
+    passages: list[dict]                      # every passage it saw: [{chunk_id, rank, score, step}]
     generator: dict
     prompt_version: str | None = None
     input_tokens: int = 0
@@ -52,25 +64,117 @@ class Answer:
     cached: bool = False
     raw: str | None = None
     warnings: list[str] = field(default_factory=list)
+    trace: list[dict] = field(default_factory=list)  # one entry per step, see Trace
 
     def to_dict(self) -> dict:
         return asdict(self)
 
 
+StepCallback = Callable[[dict], None]
+
+
+class Trace:
+    """What a generator did, step by step, and what it saw.
+
+    Each step: {step, action, input, chunks, input_tokens, output_tokens, seconds, note?}
+    `chunks` are the chunk ids the step returned. `on_step` is called after every step
+    (for streaming progress to the UI).
+    """
+
+    def __init__(self, on_step: StepCallback | None = None):
+        self.steps: list[dict] = []
+        self.seen: dict[str, dict] = {}       # chunk_id -> {chunk_id, rank, score, step}, in order first seen
+        self.responses: list[LLMResponse] = []
+        self.on_step = on_step
+        self.t0 = time.perf_counter()
+
+    def add(self, action: str, input: dict, chunks: list[str] | None = None, response: LLMResponse | None = None,
+            seconds: float | None = None, **extra) -> dict:
+        if response is not None:
+            self.responses.append(response)
+        step = {"step": len(self.steps) + 1, "action": action, "input": input, "chunks": list(chunks or []),
+                "input_tokens": response.input_tokens if response else 0,
+                "output_tokens": response.output_tokens if response else 0,
+                "seconds": round(seconds if seconds is not None else (response.seconds if response else 0.0), 3),
+                **extra}
+        self.steps.append(step)
+        if self.on_step:
+            self.on_step(step)
+        return step
+
+    def saw(self, hits, step: int | None = None) -> None:
+        """Record retrieved hits (anything with chunk_id and score) as seen."""
+        for h in hits:
+            if h.chunk_id not in self.seen:
+                self.seen[h.chunk_id] = {"chunk_id": h.chunk_id, "rank": len(self.seen) + 1,
+                                         "score": round(float(h.score), 4), "step": step or len(self.steps) + 1}
+
+    def saw_chunks(self, chunk_ids: list[str], step: int | None = None) -> None:
+        """Record passages read without a score (e.g. neighbours of a passage)."""
+        for cid in chunk_ids:
+            if cid not in self.seen:
+                self.seen[cid] = {"chunk_id": cid, "rank": len(self.seen) + 1, "score": None,
+                                  "step": step or len(self.steps) + 1}
+
+
+def finish_answer(question: str, text: str, answerable: bool, trace: Trace, generator: "Generator",
+                  warnings: list[str] | None = None) -> Answer:
+    """Build the Answer: check citations against everything seen, add up usage across all LLM calls."""
+    warnings = list(warnings or [])
+    seen = trace.seen
+    cited = extract_citations(text)
+    invalid = [c for c in cited if c not in seen]
+    if invalid:
+        warnings.append(f"cited {len(invalid)} passage id(s) that were not provided: {', '.join(invalid)}")
+    if answerable and not cited:
+        warnings.append("answer has no citations")
+    rs = trace.responses
+    costs = [r.cost for r in rs]
+    return Answer(
+        question=question, answer=text, answerable=answerable,
+        citations=[c for c in cited if c in seen], invalid_citations=invalid,
+        passages=list(seen.values()), generator=generator.config(), prompt_version=generator.prompt_version,
+        input_tokens=sum(r.input_tokens for r in rs), output_tokens=sum(r.output_tokens for r in rs),
+        cost=None if any(c is None for c in costs) else sum(costs),
+        seconds=round(time.perf_counter() - trace.t0, 3), cached=bool(rs) and all(r.cached for r in rs),
+        raw=rs[-1].text if rs else None, warnings=warnings, trace=trace.steps,
+    )
+
+
 class Generator(ABC):
     name = "base"
+    prompt_version: str | None = None
+
+    @abstractmethod
+    def answer(self, question: str, library: "Library", k: int = 8, retriever: str = "bm25",
+               on_step: StepCallback | None = None) -> Answer:
+        """Answer `question` from `library`. `k` is the passages per search; `on_step` gets each trace step."""
+
+    def config(self) -> dict:
+        return {"name": self.name}
+
+
+class SingleShotGenerator(Generator):
+    """Search once with the question, then answer from the top k passages."""
 
     @abstractmethod
     def generate(self, question: str, passages: list[dict]) -> tuple[str, bool, LLMResponse | None, list[str]]:
         """-> (answer text, answerable, llm response or None, warnings)"""
 
-    def config(self) -> dict:
-        return {"name": self.name}
+    def answer(self, question, library, k=8, retriever="bm25", on_step=None):
+        trace = Trace(on_step)
+        t = time.perf_counter()
+        hits = library.search(question, k=k, retriever=retriever)
+        trace.saw(hits, step=1)
+        trace.add("search", {"query": question, "k": k, "retriever": retriever}, [h.chunk_id for h in hits],
+                  seconds=time.perf_counter() - t)
+        passages = [library.chunk(h.chunk_id) for h in hits]
+        text, answerable, r, warnings = self.generate(question, passages)
+        trace.add("answer", {"passages": len(passages)}, response=r)
+        return finish_answer(question, text, answerable, trace, self, warnings)
 
-    prompt_version: str | None = None
 
-
-class LLMGenerator(Generator):
+class LLMGenerator(SingleShotGenerator):
     name = "claude"
     prompt_version = ANSWER_VERSION
 
@@ -94,7 +198,7 @@ class LLMGenerator(Generator):
         return text, answerable, r, warnings
 
 
-class ExtractiveGenerator(Generator):
+class ExtractiveGenerator(SingleShotGenerator):
     """Baseline without an LLM: the passage sentence with the largest word overlap with the question."""
 
     name = "extractive"
@@ -139,26 +243,7 @@ def get_generator(name: str, model: str = DEFAULT_MODEL, cache_dir: Path | None 
     raise ValueError(f"Unknown generator {name!r}. Available: {', '.join(available_generators())}")
 
 
-def answer_question(question: str, retriever, chunks_by_id: dict[str, dict], generator: Generator,
-                    k: int = 8, hits=None) -> Answer:
-    """Retrieve the top k passages (or use `hits`), generate an answer, validate its citations."""
-    t0 = time.perf_counter()
-    hits = hits if hits is not None else retriever.search(question, k=k)
-    passages = [chunks_by_id[h.chunk_id] for h in hits[:k]]
-    text, answerable, r, warnings = generator.generate(question, passages)
-    given = {p["chunk_id"] for p in passages}
-    cited = extract_citations(text)
-    invalid = [c for c in cited if c not in given]
-    if invalid:
-        warnings.append(f"cited {len(invalid)} passage id(s) that were not provided: {', '.join(invalid)}")
-    if answerable and not cited:
-        warnings.append("answer has no citations")
-    return Answer(
-        question=question, answer=text, answerable=answerable,
-        citations=[c for c in cited if c in given], invalid_citations=invalid,
-        passages=[{"chunk_id": h.chunk_id, "rank": i, "score": round(h.score, 4)} for i, h in enumerate(hits[:k], 1)],
-        generator=generator.config(), prompt_version=generator.prompt_version,
-        input_tokens=r.input_tokens if r else 0, output_tokens=r.output_tokens if r else 0,
-        cost=r.cost if r else 0.0, seconds=round(time.perf_counter() - t0, 3), cached=bool(r and r.cached),
-        raw=r.text if r else None, warnings=warnings,
-    )
+def answer_question(question: str, library: "Library", generator: Generator, k: int = 8,
+                    retriever: str = "bm25", on_step: StepCallback | None = None) -> Answer:
+    """Shorthand for generator.answer(...)."""
+    return generator.answer(question, library, k=k, retriever=retriever, on_step=on_step)

@@ -12,7 +12,7 @@ from evaluation.answer_runner import run_answer_eval  # noqa: E402
 from evaluation.judge import Judge, agreement, cohen_kappa  # noqa: E402
 from generation.answer import ExtractiveGenerator, LLMGenerator, answer_question, extract_citations  # noqa: E402
 from generation.llm import CachedLLM, LLMNotConfigured, LLMResponse, ScriptedLLM, make_llm, parse_json  # noqa: E402
-from retrieval import get_retriever  # noqa: E402
+from library import Library  # noqa: E402
 
 
 def chunk(cid, paper, text, title="Paper"):
@@ -28,10 +28,8 @@ CHUNKS = [
 BY_ID = {c["chunk_id"]: c for c in CHUNKS}
 
 
-def retriever():
-    r = get_retriever("bm25")
-    r.index(CHUNKS)
-    return r
+def library():
+    return Library(CHUNKS, name="test")
 
 
 # ------------------------------------------------------------------ parsing helpers
@@ -58,7 +56,7 @@ def test_missing_key_is_reported(monkeypatch):
 
 def test_llm_generator_validates_citations():
     llm = ScriptedLLM(lambda s, p: '{"answerable": true, "answer": "Bulk silicon [BP#000], see also [XX#999]."}')
-    ans = answer_question("What test system demonstrated the method?", retriever(), BY_ID, LLMGenerator(llm), k=2)
+    ans = answer_question("What test system demonstrated the method?", library(), LLMGenerator(llm), k=2)
     assert ans.answerable and ans.citations == ["BP#000"] and ans.invalid_citations == ["XX#999"]
     assert any("not provided" in w for w in ans.warnings)
     system, prompt = llm.calls[0]
@@ -68,19 +66,19 @@ def test_llm_generator_validates_citations():
 
 
 def test_llm_generator_abstains_and_survives_bad_json():
-    ans = answer_question("x?", retriever(), BY_ID,
+    ans = answer_question("x?", library(),
                           LLMGenerator(ScriptedLLM(lambda s, p: '{"answerable": false, "answer": "Not in these passages."}')))
     assert not ans.answerable
-    ans = answer_question("Where was the method demonstrated?", retriever(), BY_ID,
+    ans = answer_question("Where was the method demonstrated?", library(),
                           LLMGenerator(ScriptedLLM(lambda s, p: "Bulk silicon [BP#000].")))
     assert ans.answerable and ans.citations == ["BP#000"] and "expected JSON" in ans.warnings[0]
 
 
 def test_extractive_baseline():
-    ans = answer_question("Which test system demonstrated the method, bulk silicon?", retriever(), BY_ID,
+    ans = answer_question("Which test system demonstrated the method, bulk silicon?", library(),
                           ExtractiveGenerator())
     assert ans.answerable and ans.answer.endswith("[BP#000]") and ans.citations == ["BP#000"]
-    none = answer_question("zebra giraffe", retriever(), BY_ID, ExtractiveGenerator())
+    none = answer_question("zebra giraffe", library(), ExtractiveGenerator())
     assert not none.answerable
 
 

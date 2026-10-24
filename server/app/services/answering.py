@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from ..core import DEFAULT_MODEL, PRICES, LLMNotConfigured, answer_question, available_generators, get_generator
+from ..core import DEFAULT_MODEL, PRICES, LLMNotConfigured, available_generators, get_generator
 from .chunks import RunData
 from .evidence import chunk_view
 
@@ -35,7 +35,7 @@ class AnsweringService:
     def ask(self, run: RunData, question: str, retriever: str, generator: str, model: str | None, k: int,
             titles: dict[str, str]) -> dict:
         gen = self.generator(generator, model)
-        ans = answer_question(question, run.retriever(retriever), run.by_id, gen, k=k)
+        ans = gen.answer(question, run, k=k, retriever=retriever)
         cited = {cid: i for i, cid in enumerate(ans.citations, 1)}
         passages = []
         for p in ans.passages:

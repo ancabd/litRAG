@@ -1,6 +1,6 @@
 # litrag
 
-Agentic RAG over academic literature (tested on machine-learned interatomic potentials and biomolecular simulation), with an evaluation harness and a web app.
+Agentic RAG over the literature on machine-learned interatomic potentials and biomolecular simulation, with an evaluation harness and a web app.
 
 ```
 litrag/
@@ -87,8 +87,9 @@ web (React)  --/api-->  server/app/routers  -->  server/app/services  -->  corpu
                         ask, evals               jobs
 ```
 
+- **`corpus-builder/library.py`** is the one way to read a chunk run: `search` (with `paper`, `year_from`/`year_to`, `exclude` filters), `chunk`, `neighbours`, `paper` (title, year, section outline), `section_chunks`. The CLI, the evals, the server (each cached chunk run is a `Library`) and the generators all use it, so they see the corpus the same way. The agent's tools will be thin wrappers over these methods.
 - **Routers** only translate HTTP; **services** hold the logic and caches (chunk runs and retriever indexes are loaded once and reloaded when their files change); the **core** stays usable from the command line.
 - **Adding a retriever** (dense, hybrid, rerank): a new file in `corpus-builder/retrieval/` plus one registry line. It then shows up in `evaluate.py`, in `/api/search?retriever=...` and in `/api/meta`.
-- **Generation** lives in `corpus-builder/generation/`: `llm.py` (the Anthropic client, the on-disk cache, prices), `prompts.py` (versioned prompts; the version is recorded in every run) and `answer.py` (generators). A new generator, e.g. the agentic loop that searches several times before answering, is a `Generator` subclass plus one registry line, and then shows up in `evaluate.py`, the Ask page and the answer eval.
+- **Generation** lives in `corpus-builder/generation/`: `llm.py` (the Anthropic client, the on-disk cache, prices), `prompts.py` (versioned prompts; the version is recorded in every run) and `answer.py` (generators). Generators get the question and the `Library` and decide what to read; every answer carries a step-by-step `trace` and the list of passages it saw, and its citations are checked against those. The LLM layer has `complete` (one prompt) and `chat` (a conversation with tool use), both cached. A new generator, e.g. the agentic loop, is a `Generator` subclass plus one registry line, and then shows up in `evaluate.py`, the Ask page and the answer eval.
 - **Long jobs** (answer evals) run in a background thread (`services/jobs.py`) and the UI polls `/api/jobs/{id}`.
 - **Paths** default to the layout above. `LITRAG_DATA` moves the whole data folder; `LITRAG_CORPUS`, `LITRAG_CHUNKS`, `LITRAG_QUESTIONS`, `LITRAG_RUNS`, `LITRAG_CACHE`, `LITRAG_CORE` and `LITRAG_WEB_DIST` move single parts. The command-line tools find `data/` from any working directory.

@@ -1,7 +1,7 @@
-"""Chunk runs (chunks/<name>/chunks.jsonl) and the retrievers built on them.
+"""Chunk runs (data/chunks/<name>/chunks.jsonl), each held as a core Library.
 
 A run is loaded once and cached; it is reloaded if its chunks.jsonl changes
-(e.g. after `parse_corpus.py run`). Retriever indexes are cached per run, so the
+(e.g. after `parse_corpus.py run`). The Library caches retriever indexes, so the
 first search on a run builds the index and later searches are fast.
 """
 from __future__ import annotations
@@ -9,43 +9,19 @@ from __future__ import annotations
 import json
 import re
 import threading
-from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..core import GoldIndex, Retriever, get_retriever, load_chunks
+from ..core import Library, load_chunks
 
 RUN_NAME = re.compile(r"^[A-Za-z0-9_.@-]+$")
 
 
-@dataclass
-class RunData:
-    name: str
-    mtime: float
-    chunks: list[dict]
-    by_id: dict[str, dict]
-    by_paper: dict[str, list[dict]]
-    info: dict | None
-    _gold: GoldIndex | None = None
-    _retrievers: dict[str, Retriever] = field(default_factory=dict)
-    _lock: threading.Lock = field(default_factory=threading.Lock)
+class RunData(Library):
+    """A chunk run as the server holds it: the core Library plus the file time it was loaded from."""
 
-    @property
-    def gold(self) -> GoldIndex:
-        with self._lock:
-            if self._gold is None:
-                self._gold = GoldIndex(self.chunks)
-            return self._gold
-
-    def retriever(self, name: str) -> Retriever:
-        with self._lock:
-            if name not in self._retrievers:
-                r = get_retriever(name)
-                r.index(self.chunks)
-                self._retrievers[name] = r
-            return self._retrievers[name]
-
-    def chunk_counts(self) -> dict[str, int]:
-        return {pid: len(cs) for pid, cs in self.by_paper.items()}
+    def __init__(self, name: str, mtime: float, chunks: list[dict], info: dict | None):
+        super().__init__(chunks, name=name, info=info)
+        self.mtime = mtime
 
 
 class ChunkService:
@@ -87,12 +63,7 @@ class ChunkService:
         with self._lock:
             run = self._runs.get(name)
             if run is None or run.mtime != mtime:
-                chunks = load_chunks(f)
-                by_paper: dict[str, list[dict]] = {}
-                for c in chunks:
-                    by_paper.setdefault(c["paper_id"], []).append(c)
-                run = RunData(name, mtime, chunks, {c["chunk_id"]: c for c in chunks}, by_paper,
-                              _read_json(self.root / name / "run.json"))
+                run = RunData(name, mtime, load_chunks(f), _read_json(self.root / name / "run.json"))
                 self._runs[name] = run
             return run
 

@@ -1,6 +1,4 @@
-"""Retrieval over a chunk run. This is also the first half of the future /api/ask:
-an answer route will call the same RunData.retriever(...).search(...) and hand the
-hits to an LLM."""
+"""Retrieval over a chunk run, through the same Library.search the generators use."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -18,10 +16,7 @@ def search(q: str = Query(..., min_length=1), run: str | None = None, retriever:
     if retriever not in available_retrievers():
         raise HTTPException(400, f"Unknown retriever {retriever!r}; available: {available_retrievers()}")
     data = require_run(svc, run)
-    r = data.retriever(retriever)
-    hits = r.search(q, k=len(data.chunks) if paper else k)
-    if paper:
-        hits = [h for h in hits if data.by_id[h.chunk_id]["paper_id"] == paper][:k]
+    hits = data.search(q, k=k, retriever=retriever, paper=paper)
     titles = svc.corpus.titles()
     items = []
     for rank, h in enumerate(hits, 1):
@@ -29,4 +24,4 @@ def search(q: str = Query(..., min_length=1), run: str | None = None, retriever:
         items.append({**chunk_view(c), "rank": rank, "score": round(h.score, 3),
                       "title": c.get("title") or titles.get(c["paper_id"]), "year": c.get("year"),
                       "authors": c.get("authors")})
-    return {"query": q, "run": data.name, "retriever": r.config(), "items": items}
+    return {"query": q, "run": data.name, "retriever": data.retriever(retriever).config(), "items": items}

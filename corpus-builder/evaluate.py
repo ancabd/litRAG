@@ -28,7 +28,7 @@ import paths
 from evaluation.matching import GoldIndex
 from evaluation.questions import QuestionFileError, load_questions
 from evaluation.runner import DEFAULT_KS, compare_runs, run_eval
-from retrieval import available, get_retriever, load_chunks
+from retrieval import available, load_chunks
 
 DEFAULT_QUESTIONS = paths.QUESTIONS
 DEFAULT_CHUNKS = paths.default_chunk_run()
@@ -88,12 +88,10 @@ def cmd_check(args) -> int:
 
 
 def cmd_search(args) -> int:
-    chunks = load_chunks(args.chunks)
-    by_id = {c["chunk_id"]: c for c in chunks}
-    r = get_retriever(args.retriever)
-    r.index(chunks)
-    for h in r.search(args.query, k=args.k):
-        c = by_id[h.chunk_id]
+    from library import Library
+    library = Library.load(args.chunks)
+    for h in library.search(args.query, k=args.k, retriever=args.retriever, paper=args.paper):
+        c = library.chunk(h.chunk_id)
         pages = f"p{c['page_start']}" if c.get("page_start") else c.get("source")
         print(f"\n#{h.rank}  {h.score:.2f}  {c['chunk_id']}  {(c.get('title') or '')[:70]} ({c.get('year')})")
         print(f"     {c['section'][:80]}  [{pages}]")
@@ -120,17 +118,16 @@ def _generator(args):
 
 
 def cmd_ask(args) -> int:
-    from generation import LLMNotConfigured, answer_question
-    chunks = load_chunks(args.chunks)
-    r = get_retriever(args.retriever)
-    r.index(chunks)
+    from generation import LLMNotConfigured
+    from library import Library
+    library = Library.load(args.chunks)
     try:
         gen = _generator(args)
     except LLMNotConfigured as exc:
         print(exc)
         return 2
-    ans = answer_question(args.question, r, {c["chunk_id"]: c for c in chunks}, gen, k=args.k)
-    by_id = {c["chunk_id"]: c for c in chunks}
+    ans = gen.answer(args.question, library, k=args.k, retriever=args.retriever)
+    by_id = library.by_id
     print(textwrap.fill(ans.answer, 100) if ans.answerable else f"Not answerable from the corpus. {ans.answer}")
     if ans.citations:
         print("\nSources:")
@@ -193,6 +190,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--retriever", default="bm25", choices=available())
     s.add_argument("-k", type=int, default=5)
     s.add_argument("--chars", type=int, default=400, help="characters of each chunk to show")
+    s.add_argument("--paper", help="only search this paper (OpenAlex id)")
 
     r = sub.add_parser("run", help="score a retriever")
     common(r)

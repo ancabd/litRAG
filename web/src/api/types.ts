@@ -272,13 +272,24 @@ export interface JudgeVerdict {
   reason: string;
 }
 
+export interface TraceStep {
+  step: number;
+  action: string; // "search", "answer", later the agent's tools
+  input: Record<string, unknown>;
+  chunks: string[];
+  input_tokens: number;
+  output_tokens: number;
+  seconds: number;
+  note?: string;
+}
+
 export interface Answer {
   question: string;
   answer: string;
   answerable: boolean;
   citations: string[];
   invalid_citations: string[];
-  passages: { chunk_id: string; rank: number; score: number }[];
+  passages: { chunk_id: string; rank: number; score: number | null; step?: number }[];
   generator: { name: string; model?: string; prompt?: string };
   prompt_version: string | null;
   input_tokens: number;
@@ -287,6 +298,7 @@ export interface Answer {
   seconds: number;
   cached: boolean;
   warnings: string[];
+  trace?: TraceStep[]; // absent in runs made before traces existed
 }
 
 export interface AskResult extends Answer {

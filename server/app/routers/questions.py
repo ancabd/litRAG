@@ -157,7 +157,7 @@ def review(qid: str, run: str | None = None, retriever: str = "bm25", k: int = 1
     q, version = _find(svc, qid)
     data = require_run(svc, run)
     judged = judgments(data, q)
-    hits = data.retriever(retriever).search(q["question"], k=max(1, min(k, 50)))
+    hits = data.search(q["question"], k=max(1, min(k, 50)), retriever=retriever)
     titles = svc.corpus.titles()
     items = []
     for rank, h in enumerate(hits, 1):

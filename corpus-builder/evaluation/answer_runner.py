@@ -9,7 +9,7 @@ Per question:
   supported                    judge: are the answer's claims in the passages it cites (1 / 0.5 / 0)
   cites_gold                   does it cite one of your evidence passages (or an alternative)
   invalid_citations            did it cite a passage id it was never given
-  retrieved_gold               was any evidence passage among the k passages it got
+  retrieved_gold               was any evidence passage among the passages it saw
   abstained_when_unanswerable  said "not in the corpus" on an unanswerable question (want 1)
   abstained_when_answerable    said "not in the corpus" although the answer was there (want 0)
 
@@ -23,8 +23,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from generation.answer import Generator, answer_question
-from retrieval import get_retriever, load_chunks
+from generation.answer import Generator
+from library import Library
 
 from .judge import Judge
 from .matching import GoldIndex
@@ -52,16 +52,14 @@ def run_answer_eval(questions_path: Path, chunks_path: Path, generator: Generato
     questions = load_questions(questions_path)
     if split:
         questions = [q for q in questions if q.split == split]
-    chunks = load_chunks(chunks_path)
-    by_id = {c["chunk_id"]: c for c in chunks}
-    gold = GoldIndex(chunks, threshold=threshold)
-    retriever = get_retriever(retriever_name)
-    retriever.index(chunks)
+    library = Library.load(chunks_path)
+    by_id = library.by_id
+    gold = GoldIndex(library.chunks, threshold=threshold)
+    retriever = library.retriever(retriever_name)
 
     rows, gen_cost, gen_in, gen_out = [], 0.0, 0, 0
     for i, q in enumerate(questions, 1):
-        hits = retriever.search(q.question, k=k)
-        ans = answer_question(q.question, retriever, by_id, generator, k=k, hits=hits)
+        ans = generator.answer(q.question, library, k=k, retriever=retriever_name)
         gen_cost += ans.cost or 0.0
         gen_in += ans.input_tokens
         gen_out += ans.output_tokens
@@ -106,8 +104,7 @@ def run_answer_eval(questions_path: Path, chunks_path: Path, generator: Generato
             "evidence": [{"paper": e.paper, "quote": e.quote, "gold_chunks": sorted(e.gold_chunks),
                           "alt_chunks": sorted(e.alt_chunks), "resolved": e.resolved} for e in evidence],
             "not_relevant_chunks": sorted(not_rel),
-            "retrieved": [{"chunk_id": h.chunk_id, "score": round(h.score, 4), "rank": r}
-                          for r, h in enumerate(hits[:k], 1)],
+            "retrieved": [{"chunk_id": p["chunk_id"], "score": p["score"], "rank": p["rank"]} for p in ans.passages],
             "judgments": judgments,
             "metrics": m,
         })
