@@ -4,7 +4,7 @@ Turns the corpus built by `corpus_builder.py` into `chunks.jsonl`, the input for
 
 ```bash
 pip install -r requirements.txt
-python parse_corpus.py run                    # writes chunks/pymupdf_w400_o60/
+python parse_corpus.py run                    # writes data/chunks/pymupdf_w400_o60/
 ```
 
 ## What goes in
@@ -18,11 +18,11 @@ python parse_corpus.py run                    # writes chunks/pymupdf_w400_o60/
 ## Output
 
 ```
-chunks/pymupdf_w400_o60/        one folder per parser + chunk config, so runs never overwrite each other
+data/chunks/pymupdf_w400_o60/   one folder per parser + chunk config, so runs never overwrite each other
   chunks.jsonl                  one chunk per line
   papers.csv                    per paper: source, pages, sections, chunks, warnings, parse errors
   run.json                      config, parser version, counts, failures, timing
-corpus/parsed/pymupdf@2/        cached parsed documents (one JSON per paper)
+data/corpus/parsed/pymupdf@2/   cached parsed documents (one JSON per paper)
 ```
 
 A chunk looks like this:
@@ -41,8 +41,8 @@ Every chunk carries its paper's metadata and page range, so the app can cite "Ba
 
 ```bash
 # Look at what the parser makes of one paper (do this for ~5 papers before trusting it)
-python parse_corpus.py inspect corpus/pdfs/W2042.pdf > W2042.md
-python parse_corpus.py inspect corpus/pdfs/W2042.pdf --chunks      # see chunk boundaries
+python parse_corpus.py inspect ../data/corpus/pdfs/W2042.pdf > W2042.md
+python parse_corpus.py inspect ../data/corpus/pdfs/W2042.pdf --chunks      # see chunk boundaries
 
 # Try another chunk size: reuses the parse cache, takes seconds
 python parse_corpus.py run --chunk-size 250 --overlap 40
@@ -93,7 +93,7 @@ Sizes are in words (1 word is roughly 1.3 tokens). Chunks never cross section bo
    "docling": "ingest.parsers.docling_parser:DoclingParser",
    ```
 
-3. Run `python parse_corpus.py run --parser docling`. Output goes to `chunks/docling_w400_o60/`, next to the PyMuPDF run, so you can run the same eval on both and compare.
+3. Run `python parse_corpus.py run --parser docling`. Output goes to `data/chunks/docling_w400_o60/`, next to the PyMuPDF run, so you can run the same eval on both and compare.
 
 Nothing downstream changes: chunking, indexing and evaluation only ever see `ParsedDocument` and `chunks.jsonl`.
 

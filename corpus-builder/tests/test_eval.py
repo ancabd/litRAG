@@ -180,7 +180,7 @@ def test_question_validation_catches_mistakes(tmp_path):
 
 
 def test_shipped_template_is_valid():
-    qs = load_questions(ROOT / "questions" / "questions.yaml")
+    qs = load_questions(ROOT.parent / "data" / "questions" / "questions.yaml")
     assert len(qs) >= 7 and {q.type for q in qs} == {"lookup", "comparison", "unanswerable"}
     assert sum("equation" in q.tags for q in qs) >= 2
 

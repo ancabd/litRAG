@@ -2,8 +2,12 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 import type {
+  AskResult,
   Chunk,
   EvalBrief,
+  Job,
+  LlmStatus,
+  Verdict,
   EvalCompare,
   EvalDetail,
   EvidenceCheckResult,
@@ -211,11 +215,51 @@ export const useCompare = (names: string[]) =>
     enabled: names.length >= 2,
   });
 
+export interface StartEvalBody {
+  kind: "retrieval" | "answer";
+  chunks: string | null;
+  retriever: string;
+  split: string;
+  generator?: string;
+  model?: string;
+  judge?: string;
+  k?: number;
+}
+
+/** Retrieval evals finish in the request ({name}); answer evals start a job ({job}). */
 export function useStartEval() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (b: { chunks: string | null; retriever: string; split: string }) => api.post<{ name: string }>("/evals", b),
+    mutationFn: (b: StartEvalBody) => api.post<{ name?: string; job?: Job }>("/evals", b),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["evals"] }),
+  });
+}
+
+export function useJob(id: string | null) {
+  return useQuery({
+    queryKey: ["job", id],
+    queryFn: () => api.get<Job>(`/jobs/${id}`),
+    enabled: !!id,
+    refetchInterval: (q) => (q.state.data?.state === "running" || !q.state.data ? 1000 : false),
+  });
+}
+
+export function useSetVerdict(name: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ qid, verdict }: { qid: string; verdict: Verdict | null }) =>
+      api.put<{ human: { correctness: Verdict } | null }>(`/evals/${encodeURIComponent(name)}/verdicts/${encodeURIComponent(qid)}`, { verdict }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["eval", name] }),
+  });
+}
+
+export const useLlm = () => useQuery({ queryKey: ["llm"], queryFn: () => api.get<LlmStatus>("/llm") });
+
+export function useAsk() {
+  const { run } = useRun();
+  return useMutation({
+    mutationFn: (b: { question: string; generator: string; model?: string; k: number; retriever?: string }) =>
+      api.post<AskResult>("/ask", { ...b, run }),
   });
 }
 

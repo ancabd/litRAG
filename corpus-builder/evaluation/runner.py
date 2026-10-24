@@ -46,9 +46,12 @@ def groups_of(q: Question) -> list[str]:
 
 
 def run_eval(questions_path: Path, chunks_path: Path, retriever_name: str = "bm25",
-             split: str | None = "dev", ks: tuple[int, ...] = DEFAULT_KS, out_root: Path = Path("runs"),
+             split: str | None = "dev", ks: tuple[int, ...] = DEFAULT_KS, out_root: Path | None = None,
              retriever_options: dict | None = None, threshold: float = 0.5, name: str | None = None) -> Path:
     t0 = time.perf_counter()
+    if out_root is None:
+        import paths
+        out_root = paths.RUNS
     questions = load_questions(questions_path)
     if split:
         questions = [q for q in questions if q.split == split]
@@ -219,8 +222,13 @@ def render_report(summary: dict, rows: list[dict], chunk_by_id: dict[str, dict])
 
 
 def compare_runs(run_dirs: list[Path], metrics: list[str] | None = None) -> str:
-    metrics = metrics or HEADLINE + [LENIENT + m for m in ("hit@5", "hit@10", "mrr")] + ["judged@10"]
     summaries = [json.loads((Path(d) / "summary.json").read_text()) for d in run_dirs]
+    if metrics is None:
+        if all(s.get("kind") == "answer" for s in summaries):
+            from .answer_runner import METRICS as ANSWER_METRICS
+            metrics = ANSWER_METRICS
+        else:
+            metrics = HEADLINE + [LENIENT + m for m in ("hit@5", "hit@10", "mrr")] + ["judged@10"]
     names = [Path(d).name for d in run_dirs]
     hashes = {s["questions_sha1"] for s in summaries}
     out = ["| metric | " + " | ".join(names) + " |", "|---|" + "---|" * len(names)]

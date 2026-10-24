@@ -11,12 +11,28 @@ const LABELS: Record<string, string> = {
   mrr: "MRR",
   "ndcg@10": "nDCG@10",
   "paper_hit@10": "Right paper@10",
+  correct: "Correct",
+  supported: "Supported by citations",
+  cites_gold: "Cites your evidence",
+  retrieved_gold: "Evidence retrieved",
+  invalid_citations: "Invalid citations ↓",
+  abstained_when_unanswerable: "Declines unanswerable",
+  abstained_when_answerable: "Declines answerable ↓",
 };
 
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 const fmt = (i: Interval) => `${i.mean.toFixed(2)} [${i.lo.toFixed(2)}–${i.hi.toFixed(2)}]`;
 
-export function ScoreChart({ results, metrics }: { results: Record<string, Interval>; metrics: string[] }) {
+export function ScoreChart({
+  results,
+  metrics,
+  strictLabel = "Strict: only your original evidence",
+}: {
+  results: Record<string, Interval>;
+  metrics: string[];
+  /** Legend text for the main series; null hides the legend swatch (single-series charts). */
+  strictLabel?: string | null;
+}) {
   const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null);
   const rows = metrics.filter((m) => results[m]);
   const hasLenient = rows.some((m) => results[`lenient_${m}`]);
@@ -27,7 +43,7 @@ export function ScoreChart({ results, metrics }: { results: Record<string, Inter
       style={{ left: pct(i.lo), width: `max(2px, ${pct(i.hi - i.lo)})` }}
       onMouseMove={(e) => {
         const box = (e.currentTarget.closest(".scorechart") as HTMLElement).getBoundingClientRect();
-        setTip({ x: e.clientX - box.left, y: e.clientY - box.top, text: `${LABELS[m] ?? m}, ${which}: ${fmt(i)} (n=${i.n})` });
+        setTip({ x: e.clientX - box.left, y: e.clientY - box.top, text: `${LABELS[m] ?? m}${which === "strict" && !hasLenient ? "" : `, ${which}`}: ${fmt(i)} (n=${i.n})` });
       }}
       onMouseLeave={() => setTip(null)}
     >
@@ -38,9 +54,11 @@ export function ScoreChart({ results, metrics }: { results: Record<string, Inter
   return (
     <figure className="scorechart" aria-label="Scores with 95% confidence intervals">
       <div className="sc-legend">
-        <span>
-          <i className="sw sw-strict" /> Strict: only your original evidence
-        </span>
+        {(strictLabel || hasLenient) && (
+          <span>
+            <i className="sw sw-strict" /> {strictLabel ?? "Score"}
+          </span>
+        )}
         {hasLenient && (
           <span>
             <i className="sw sw-lenient" /> Lenient: alternatives count too

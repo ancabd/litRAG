@@ -11,10 +11,13 @@ import shutil
 import threading
 from pathlib import Path
 
-from ..core import run_eval
+from ..core import agreement, run_answer_eval, run_eval
 
 NAME = re.compile(r"^[A-Za-z0-9_.@-]+$")
 HEADLINE = ["hit@1", "hit@5", "hit@10", "recall@10", "mrr", "ndcg@10", "paper_hit@10"]
+ANSWER_HEADLINE = ["correct", "supported", "cites_gold", "retrieved_gold", "invalid_citations",
+                   "abstained_when_unanswerable", "abstained_when_answerable"]
+VERDICTS = ("correct", "partial", "incorrect")
 
 
 def _read_json(path: Path):
@@ -74,8 +77,19 @@ class EvalRunService:
     def _brief(name: str, s: dict) -> dict:
         a = (s.get("results") or {}).get("all") or {}
         cc = s.get("chunks_config") or {}
+        kind = s.get("kind") or "retrieval"
+        if kind == "answer":
+            headline = {m: {"strict": a[m]["mean"], "lenient": None} for m in ANSWER_HEADLINE if m in a}
+        else:
+            headline = {m: {"strict": (a.get(m) or {}).get("mean"), "lenient": (a.get("lenient_" + m) or {}).get("mean")}
+                        for m in HEADLINE if m in a}
         return {
             "name": name,
+            "kind": kind,
+            "generator": s.get("generator"),
+            "judge": s.get("judge"),
+            "k": s.get("k"),
+            "usage": s.get("usage"),
             "created": s.get("created"),
             "retriever": s.get("retriever"),
             "chunks": Path(s.get("chunks") or "").name or None,
@@ -85,8 +99,7 @@ class EvalRunService:
             "n_questions": s.get("n_questions"),
             "questions_sha1": s.get("questions_sha1"),
             "git_commit": s.get("git_commit"),
-            "headline": {m: {"strict": (a.get(m) or {}).get("mean"), "lenient": (a.get("lenient_" + m) or {}).get("mean")}
-                         for m in HEADLINE if m in a},
+            "headline": headline,
             "judged": (a.get("judged@10") or {}).get("mean"),
         }
 
@@ -113,8 +126,45 @@ class EvalRunService:
                               "page_end": c.get("page_end"), "source": c.get("source"), "text": c.get("text"),
                               "n_words": c.get("n_words")})
         report = (d / "report.md").read_text(encoding="utf-8") if (d / "report.md").exists() else None
-        return {**self._brief(name, s), "summary": s, "questions": rows, "report": report,
-                "chunks_available": bool(chunks)}
+        out = {**self._brief(name, s), "summary": s, "questions": rows, "report": report,
+               "chunks_available": bool(chunks)}
+        if out["kind"] == "answer":
+            human = self._human(d)
+            for r in rows:
+                r["human"] = human.get(r["id"])
+            out["agreement"] = agreement(rows, human)
+        return out
+
+    # ---------------------------------------------------------------- answer runs
+
+    def _human(self, d: Path) -> dict:
+        return _read_json(d / "human.json") or {}
+
+    def set_verdict(self, name: str, qid: str, verdict: str | None) -> dict:
+        """Your correctness verdict for one answer (judge validation). None clears it."""
+        d = self._dir(name)
+        if d is None:
+            raise FileNotFoundError(name)
+        if verdict is not None and verdict not in VERDICTS:
+            raise ValueError(f"verdict must be one of {VERDICTS}")
+        with self._lock:
+            human = self._human(d)
+            if verdict is None:
+                human.pop(qid, None)
+            else:
+                human[qid] = {"correctness": verdict}
+            tmp = d / "human.json.tmp"
+            tmp.write_text(json.dumps(human, indent=2), encoding="utf-8")
+            tmp.replace(d / "human.json")
+        return human
+
+    def start_answer(self, chunks_run: str, retriever: str, split: str | None, generator, judge, k: int,
+                     progress=None) -> str:
+        if not NAME.match(chunks_run) or not (self.chunks_root / chunks_run / "chunks.jsonl").exists():
+            raise FileNotFoundError(f"No chunk run '{chunks_run}'")
+        run_dir = run_answer_eval(self.questions_file, self.chunks_root / chunks_run, generator, judge, retriever,
+                                  None if split in (None, "all") else split, k, out_root=self.root, progress=progress)
+        return run_dir.name
 
     def start(self, chunks_run: str, retriever: str, split: str | None) -> str:
         if not NAME.match(chunks_run) or not (self.chunks_root / chunks_run / "chunks.jsonl").exists():
@@ -143,15 +193,21 @@ class EvalRunService:
                 for line in (d / "per_question.jsonl").read_text(encoding="utf-8").splitlines():
                     if line.strip():
                         r = json.loads(line)
-                        rows[r["id"]] = {"question": r["question"], **ranks(r)}
+                        entry = {"question": r["question"], **ranks(r)}
+                        if "answer" in r:
+                            entry["verdict"] = (r.get("judgments") or {}).get("correctness", {}).get("verdict")
+                            entry["abstained"] = not r["answer"]["answerable"]
+                            entry["unanswerable"] = r["type"] == "unanswerable"
+                        rows[r["id"]] = entry
             runs.append((n, s, rows))
         ids = sorted({qid for _, _, rows in runs for qid in rows})
         return {
             "runs": [{**self._brief(n, s), "results": (s.get("results") or {}).get("all") or {}} for n, s, _ in runs],
             "same_questions": len({s.get("questions_sha1") for _, s, _ in runs}) <= 1,
+            "kinds": sorted({s.get("kind") or "retrieval" for _, s, _ in runs}),
             "questions": [{"id": qid,
                            "question": next((rows[qid]["question"] for _, _, rows in runs if qid in rows), ""),
-                           "per_run": [({"strict_rank": rows[qid]["strict_rank"], "lenient_rank": rows[qid]["lenient_rank"]}
+                           "per_run": [({k_: v for k_, v in rows[qid].items() if k_ != "question"}
                                         if qid in rows else None) for _, _, rows in runs]}
                           for qid in ids],
         }

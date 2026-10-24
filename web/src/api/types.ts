@@ -182,6 +182,11 @@ export interface Interval {
 
 export interface EvalBrief {
   name: string;
+  kind: "retrieval" | "answer";
+  generator: { name: string; model?: string; provider?: string; prompt?: string } | null;
+  judge: { model?: string; prompt?: string } | null;
+  k: number | null;
+  usage: { generator: Usage; judge: Usage | null } | null;
   created: string | null;
   retriever: Record<string, unknown> & { name: string };
   chunks: string | null;
@@ -218,8 +223,13 @@ export interface EvalQuestion {
   tags: string[];
   strict_rank: number | null;
   lenient_rank: number | null;
-  metrics: Record<string, number>;
+  metrics: Record<string, number | null>;
   retrieved: EvalHit[];
+  // answer runs
+  reference?: string | null;
+  answer?: Answer;
+  judgments?: { correctness?: JudgeVerdict; support?: JudgeVerdict };
+  human?: { correctness: Verdict } | null;
 }
 
 export interface EvalDetail extends EvalBrief {
@@ -232,10 +242,74 @@ export interface EvalDetail extends EvalBrief {
   questions: EvalQuestion[];
   report: string | null;
   chunks_available: boolean;
+  agreement?: { n: number; agreement: number | null; kappa: number | null; disagreements: string[] };
 }
 
 export interface EvalCompare {
   runs: (EvalBrief & { results: Record<string, Interval> })[];
   same_questions: boolean;
-  questions: { id: string; question: string; per_run: ({ strict_rank: number | null; lenient_rank: number | null } | null)[] }[];
+  kinds: string[];
+  questions: {
+    id: string;
+    question: string;
+    per_run: ({ strict_rank: number | null; lenient_rank: number | null; verdict?: string | null; abstained?: boolean; unanswerable?: boolean } | null)[];
+  }[];
+}
+
+// ------------------------------------------------------------------ answers
+
+export interface Usage {
+  input_tokens: number;
+  output_tokens: number;
+  cost: number | null;
+}
+
+export type Verdict = "correct" | "partial" | "incorrect";
+
+export interface JudgeVerdict {
+  verdict: string | null;
+  score: number | null;
+  reason: string;
+}
+
+export interface Answer {
+  question: string;
+  answer: string;
+  answerable: boolean;
+  citations: string[];
+  invalid_citations: string[];
+  passages: { chunk_id: string; rank: number; score: number }[];
+  generator: { name: string; model?: string; prompt?: string };
+  prompt_version: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  cost: number | null;
+  seconds: number;
+  cached: boolean;
+  warnings: string[];
+}
+
+export interface AskResult extends Answer {
+  run: string;
+  retriever: string;
+  passages: (SearchHit & { cited_as: number | null })[];
+}
+
+export interface LlmStatus {
+  configured: boolean;
+  generators: string[];
+  default_model: string;
+  models: string[];
+  prices: Record<string, { input: number; output: number }>;
+}
+
+export interface Job {
+  id: string;
+  kind: string;
+  state: "running" | "done" | "error";
+  done: number;
+  total: number | null;
+  result: { name: string } | null;
+  error: string | null;
+  details: string[];
 }

@@ -1,0 +1,24 @@
+{
+  "created": "2026-10-16T09:56:19+00:00",
+  "corpus": "/home/anca/Documents/RAG-project/litrag/corpus-builder/corpus",
+  "parser": "pymupdf@2",
+  "parser_options": {},
+  "chunking": {
+    "size": 400,
+    "overlap": 60,
+    "min_words": 40
+  },
+  "papers": 313,
+  "papers_by_source": {
+    "abstract": 158,
+    "skipped": 18,
+    "pdf": 136,
+    "abstract_fallback": 1
+  },
+  "chunks": 5592,
+  "failures": {
+    "W1548618691": "only 93 words left after cleaning"
+  },
+  "seconds": 0.8,
+  "python": "3.12.2"
+}

@@ -9,7 +9,7 @@ Examples:
   python parse_corpus.py run
   python parse_corpus.py run --chunk-size 300 --overlap 50      # re-chunks without re-parsing
   python parse_corpus.py run --parser docling                   # once a docling parser is registered
-  python parse_corpus.py inspect corpus/pdfs/W2042.pdf > W2042.md
+  python parse_corpus.py inspect ../data/corpus/pdfs/W2042.pdf > W2042.md
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ import argparse
 import sys
 from pathlib import Path
 
+import paths
 from ingest.chunking import ChunkConfig, chunk_document
 from ingest.parsers import available, get_parser
 from ingest.pipeline import run
@@ -27,8 +28,8 @@ def main(argv: list[str] | None = None) -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     r = sub.add_parser("run", help="parse and chunk the whole corpus")
-    r.add_argument("--corpus", type=Path, default=Path("corpus"), help="corpus folder (default: corpus)")
-    r.add_argument("--out", type=Path, default=Path("chunks"), help="output root (default: chunks)")
+    r.add_argument("--corpus", type=Path, default=paths.CORPUS, help=f"corpus folder (default: {paths.CORPUS})")
+    r.add_argument("--out", type=Path, default=paths.CHUNKS, help=f"output root (default: {paths.CHUNKS})")
     r.add_argument("--parser", default="pymupdf", choices=available())
     r.add_argument("--chunk-size", type=int, default=400, help="target words per chunk (default: 400)")
     r.add_argument("--overlap", type=int, default=60, help="overlap in words (default: 60)")

@@ -1,0 +1,1 @@
+{"text": "{\"verdict\": \"incorrect\", \"reason\": \"The answer declines to say which parts changed, while the reference names the CMAP backbone refit and the modified TIP3P water with stronger Lennard-Jones on hydrogens.\"}", "model": "claude-sonnet-5-5", "input_tokens": 476, "output_tokens": 77, "seconds": 1.4477328089997172, "cached": false}

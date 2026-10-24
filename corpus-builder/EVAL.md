@@ -1,15 +1,17 @@
-# Retrieval evaluation
+# Evaluation
 
-Scores how well a retriever finds the passages that answer your questions.
+Two evals on the same questions: **retrieval** (does the retriever find the passages that answer them?) and **answers** (given those passages, is the generated answer right, grounded in what it cites, and does it decline when it should?).
 
 ```bash
 python evaluate.py check     # are the questions valid, and can every evidence quote be found?
-python evaluate.py run       # score BM25 on the dev split -> runs/<timestamp>_.../report.md
+python evaluate.py run       # score BM25 on the dev split -> data/runs/<timestamp>_.../report.md
+python evaluate.py ask "How does NequIP differ from Behler-Parrinello symmetry functions?"
+python evaluate.py answer    # answer eval: generate, then judge, every dev question
 ```
 
 ## Writing questions
 
-Questions live in `questions/questions.yaml`; the comments at the top of that file explain every field. The loop:
+Questions live in `data/questions/questions.yaml`; the comments at the top of that file explain every field. The loop:
 
 1. **Think of a question** you would genuinely ask while reading these papers. Phrase it your way, not the paper's: copying the paper's wording makes keyword search look better than it is.
 2. **Find the answer**: `python evaluate.py search "a few keywords"` prints the top chunks with paper, section and page.
@@ -59,11 +61,11 @@ Every number comes with a 95% bootstrap confidence interval over questions. With
 
 Results are broken down by `type:` and `tag:`. That's where the equation question lives: compare `tag:equation` with `all`. A large gap whose misses show garbled math is the signal to try a better parser.
 
-Unanswerable questions are skipped here; they're scored later, in the answer eval (does the system decline?).
+Unanswerable questions are skipped here; the answer eval scores them (does the system decline?).
 
 ## Runs
 
-Runs can be started from the terminal (`python evaluate.py run`) or from the app's **Results** tab (**Run eval**); both use the same code and write to the same place, and the Results tab lists, shows and compares all of them. Each run writes a folder under `runs/`:
+Runs can be started from the terminal (`python evaluate.py run`) or from the app's **Results** tab (**Run eval**); both use the same code and write to the same place, and the Results tab lists, shows and compares all of them. Each run writes a folder under `data/runs/`:
 
 - `report.md`: overall metrics, breakdown, and every miss with what was retrieved instead (start reading here)
 - `summary.json`: all numbers plus the full configuration: retriever settings, chunk config, parser version, question file hash, git commit
@@ -72,10 +74,42 @@ Runs can be started from the terminal (`python evaluate.py run`) or from the app
 Compare runs side by side (it warns if the question file changed between them):
 
 ```bash
-python evaluate.py compare runs/<bm25 run> runs/<other run>
+python evaluate.py compare ../data/runs/<bm25 run> ../data/runs/<other run>
 ```
 
 Worth committing the `report.md` files: together they're the history of the project's results.
+
+## Answer evaluation
+
+`ask` and `answer` need `ANTHROPIC_API_KEY` (create a key at https://platform.claude.com). The options both share: `--retriever`, `--k` (passages given to the model, default 8), `--generator claude|extractive`, `--model` (default `claude-sonnet-5-5`), `--no-cache`. `answer` also takes `--judge <model>` (default: the generator's model; `none` for no judge), `--split`, `--name`.
+
+For each question it retrieves the top k passages, asks the model to answer from them only, citing each claim as `[chunk_id]`, or to say the passages don't answer it. Then:
+
+| metric | what it asks | how |
+|---|---|---|
+| `correct` | does the answer match your `answer` field? | LLM judge: correct 1, partial 0.5, incorrect 0 |
+| `supported` | do the passages it cites actually say this? | LLM judge, sees only the cited passages |
+| `cites_gold` | does it cite your evidence (or an alternative)? | exact, no judge |
+| `retrieved_gold` | was your evidence among the k passages at all? | exact |
+| `invalid_citations` | does it cite ids it wasn't given? (lower is better) | exact |
+| `abstained_when_unanswerable` | does it decline unanswerable questions? | exact |
+| `abstained_when_answerable` | does it decline questions the corpus answers? (lower is better) | exact |
+
+Results are also split into `retrieval:found` and `retrieval:missed`. That split is the most useful number here: a wrong answer when the evidence *was* retrieved is a generation problem (prompt, model); when it wasn't, no prompt will fix it and the retriever is what to work on.
+
+**Reference answers.** `correct` needs the question's `answer` field; questions without one are listed in the report and scored on the other metrics only. Write references as the key facts, not a paragraph: the judge accepts different wording and extra correct detail, but marks contradictions and missing key facts.
+
+**Can you trust the judge?** An LLM grading an LLM is only worth reporting with evidence that it grades like you do. On an answer run's page in the app, open answers and give your own verdict; the page shows agreement and Cohen's κ (≥ 0.6 is substantial). Your verdicts are saved in the run folder as `human.json`. Grading 15–20 answers is enough at this scale, and it's the number to put in a write-up next to the score.
+
+**The extractive baseline** (`--generator extractive`) needs no key: it returns the retrieved sentence that overlaps most with the question, with its citation, or declines when nothing overlaps. An LLM that doesn't clearly beat it isn't adding much.
+
+**Cost and caching.** Every request and response is cached in `data/cache/llm/`, keyed by model, prompts and token limit, so rerunning the same setup costs nothing and gives the same answers; changing the prompt, model or passages makes new calls. Each run records tokens and dollars for the generator and the judge. With Sonnet, 20 questions with 8 passages each cost a few cents. Prompts are versioned (`generation/prompts.py`) and the version is stored in every run, so bump it when you change a prompt.
+
+Answer runs go in `data/runs/` next to retrieval runs (`report.md` lists every answer that wasn't fully correct, with the judge's reasons), and `compare` works on them too.
+
+## Adding a generator
+
+`generation/answer.py` has the `Generator` interface: `generate(question, passages)` returns the answer text, whether it's answerable, the LLM response (for usage) and any warnings; `answer_question` wraps it, extracts and checks the citations, and returns an `Answer`. Add a subclass and one line to `GENERATORS`, and it can be used from `evaluate.py --generator`, the Ask page and the answer eval. An agentic generator (one that rewrites the query, searches again, or reads more of a paper before answering) also needs the retriever, so it will extend this interface to receive it and decide itself what to fetch.
 
 ## Adding a retriever
 

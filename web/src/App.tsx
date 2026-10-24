@@ -1,8 +1,9 @@
-// Routes and the app shell. To add a page (e.g. Ask): add a route here, a nav link
+// Routes and the app shell. To add a page: add a route here, a nav link
 // in Shell, and its API hooks in api/hooks.ts.
 import { createBrowserRouter, Navigate, NavLink, Outlet, RouterProvider } from "react-router-dom";
 import { useMeta, useQuestions } from "./api/hooks";
 import { ErrorBanner, Logo } from "./components/ui";
+import { AskPage } from "./pages/AskPage";
 import { PaperPage } from "./pages/PaperPage";
 import { PapersPage } from "./pages/PapersPage";
 import { QuestionEditor } from "./pages/QuestionEditor";
@@ -44,6 +45,7 @@ function Shell() {
           litrag
         </NavLink>
         <nav className="nav" aria-label="Main">
+          <NavLink to="/ask">Ask</NavLink>
           <NavLink to="/questions">
             Questions <span className="count">{questions.data?.items.length ?? ""}</span>
           </NavLink>
@@ -88,6 +90,7 @@ const router = createBrowserRouter([
           { path: ":id", element: <QuestionEditor /> },
         ],
       },
+      { path: "ask", element: <AskPage /> },
       { path: "papers", element: <PapersPage /> },
       { path: "papers/:id", element: <PaperPage /> },
       { path: "search", element: <SearchPage /> },

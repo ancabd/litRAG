@@ -1,0 +1,1 @@
+{"text": "{\"verdict\": \"supported\", \"reason\": \"The passage states \\\"We set the distance cutoff rcut = 5\u00c5\\\" in the context of predicting formation energies of bulk crystals from the Materials Project.\"}", "model": "claude-sonnet-5-5", "input_tokens": 1090, "output_tokens": 69, "seconds": 1.2766014570079278, "cached": false}

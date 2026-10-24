@@ -25,7 +25,7 @@ The key is optional but recommended: since February 2026 OpenAlex meters usage p
 # 1. Dry run: resolve seeds and collect metadata, download nothing
 python corpus_builder.py seeds.txt --out corpus --no-download
 
-# 2. Look at corpus/manifest.csv, adjust seeds or limits, then run for real
+# 2. Look at data/corpus/manifest.csv, adjust seeds or limits, then run for real
 python corpus_builder.py seeds.txt --out corpus
 ```
 
@@ -48,8 +48,10 @@ One paper per line: a DOI (most reliable), `arxiv:2101.03164`, an OpenAlex id (`
 
 ## Output
 
+By default it writes to `data/corpus/` at the repo root (whatever your working directory; `--out` or `LITRAG_DATA` change that).
+
 ```
-corpus/
+data/corpus/
   pdfs/W123.pdf          free full texts (verified to really be PDFs)
   abstracts/W456.md      metadata + abstract for papers without a free PDF
   manifest.csv           one row per paper, for a spreadsheet
@@ -88,8 +90,8 @@ The tests run offline against a fake HTTP session.
 
 ## Next step: parsing and chunking
 
-See [INGEST.md](INGEST.md). In short: `python parse_corpus.py run` turns `corpus/` into `chunks/<parser>_<config>/chunks.jsonl`.
+See [INGEST.md](INGEST.md). In short: `python parse_corpus.py run` turns `data/corpus/` into `data/chunks/<parser>_<config>/chunks.jsonl`.
 
 ## Then: retrieval evaluation
 
-See [EVAL.md](EVAL.md). Write questions in `questions/questions.yaml`, check them with `python evaluate.py check`, score with `python evaluate.py run`.
+See [EVAL.md](EVAL.md). Write questions in `data/questions/questions.yaml`, check them with `python evaluate.py check`, score retrieval with `python evaluate.py run` and answers with `python evaluate.py answer`.

@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useDeleteEval, useEvals, useMeta, useQuestions, useStartEval } from "../api/hooks";
+import { useDeleteEval, useEvals, useJob, useLlm, useMeta, useQuestions, useStartEval } from "../api/hooks";
+import type { EvalBrief } from "../api/types";
 import { Empty, ErrorBanner, Seg } from "../components/ui";
 import { useRun } from "../run";
 
@@ -12,30 +14,100 @@ export function when(iso: string | null): string {
   return d.toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
+function Headline({ r, m }: { r: EvalBrief; m: string }) {
+  const h = r.headline[m];
+  if (!h || h.strict == null) return <td className="num muted">–</td>;
+  return (
+    <td className="num">
+      {n2(h.strict)}
+      {h.lenient != null && <span className="muted"> / {n2(h.lenient)}</span>}
+    </td>
+  );
+}
+
+function JobProgress({ id, onDone }: { id: string; onDone: (name: string) => void }) {
+  const job = useJob(id);
+  const j = job.data;
+  useEffect(() => {
+    if (j?.state === "done" && j.result) onDone(j.result.name);
+  }, [j?.state, j?.result, onDone]);
+  if (!j) return null;
+  if (j.state === "error") return <div style={{ marginTop: 10 }}><ErrorBanner error={new Error(j.error ?? "The answer eval failed")} /></div>;
+  const frac = j.total ? j.done / j.total : 0;
+  return (
+    <div className="job" role="status" style={{ marginTop: 12 }}>
+      <div className="job-bar"><span style={{ width: `${Math.round(frac * 100)}%` }} /></div>
+      <span className="small muted">
+        Answering and judging: {j.done} of {j.total ?? "?"} questions. You can leave this page; the run keeps going.
+      </span>
+    </div>
+  );
+}
+
 function RunEvalPanel() {
   const meta = useMeta();
   const questions = useQuestions();
+  const llm = useLlm();
   const { run } = useRun();
   const start = useStartEval();
+  const qc = useQueryClient();
   const navigate = useNavigate();
+  const [kind, setKind] = useState<"retrieval" | "answer">("retrieval");
   const [chunks, setChunks] = useState<string>("");
   const [retriever, setRetriever] = useState("bm25");
   const [split, setSplit] = useState<"dev" | "test" | "all">("dev");
+  const [generator, setGenerator] = useState<"claude" | "extractive">("claude");
+  const [model, setModel] = useState("");
+  const [judge, setJudge] = useState("same");
+  const [k, setK] = useState(8);
+  const [jobId, setJobId] = useState<string | null>(null);
   const chosen = chunks || run || "";
   const items = questions.data?.items ?? [];
   const n = items.filter((q) => split === "all" || (q.split ?? "dev") === split).length;
   const fileErrors = questions.data?.errors.length ?? 0;
+  const models = llm.data?.models ?? [];
+  const genModel = model || llm.data?.default_model || "";
+  const judgeModel = judge === "same" ? (generator === "claude" ? genModel : llm.data?.default_model ?? "") : judge;
+  const needsKey = kind === "answer" && !llm.data?.configured && (generator === "claude" || judgeModel !== "none");
+
+  const finished = useCallback(
+    (name: string) => {
+      setJobId(null);
+      qc.invalidateQueries({ queryKey: ["evals"] });
+      navigate(`/results/${name}`);
+    },
+    [navigate, qc],
+  );
 
   const go = () => {
     if (split === "test" && !window.confirm("The test split is for final numbers. Running it while you're still tuning inflates them. Run it anyway?")) return;
-    start.mutate({ chunks: chosen, retriever, split }, { onSuccess: (r) => navigate(`/results/${r.name}`) });
+    const body =
+      kind === "retrieval"
+        ? { kind, chunks: chosen, retriever, split }
+        : { kind, chunks: chosen, retriever, split, generator, model: generator === "claude" ? genModel : undefined, judge: judgeModel, k };
+    start.mutate(body, {
+      onSuccess: (r) => {
+        if (r.job) setJobId(r.job.id);
+        else if (r.name) navigate(`/results/${r.name}`);
+      },
+    });
   };
+  const busy = start.isPending || !!jobId;
 
   return (
     <section className="run-panel" aria-label="Run the eval">
       <div className="row">
-        <h2>Run the eval</h2>
-        <span className="muted small">Same as python evaluate.py run</span>
+        <h2>Run an eval</h2>
+        <Seg
+          label="What to evaluate"
+          value={kind}
+          onChange={setKind}
+          options={[
+            { value: "retrieval", label: "Retrieval" },
+            { value: "answer", label: "Answers" },
+          ]}
+        />
+        <span className="muted small">Same as python evaluate.py {kind === "retrieval" ? "run" : "answer"}</span>
       </div>
       <div className="row" style={{ marginTop: 10, gap: 14 }}>
         <label className="inline-field">
@@ -69,13 +141,73 @@ function RunEvalPanel() {
             ]}
           />
         </div>
+      </div>
+      {kind === "answer" && (
+        <div className="row" style={{ marginTop: 10, gap: 14 }}>
+          <label className="inline-field">
+            <span>Answered by</span>
+            <select
+              className="select"
+              value={generator === "extractive" ? "extractive" : genModel}
+              onChange={(e) => {
+                if (e.target.value === "extractive") setGenerator("extractive");
+                else {
+                  setGenerator("claude");
+                  setModel(e.target.value);
+                }
+              }}
+            >
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+              <option value="extractive">Extractive baseline (no model)</option>
+            </select>
+          </label>
+          <label className="inline-field">
+            <span>Judge</span>
+            <select className="select" value={judge} onChange={(e) => setJudge(e.target.value)}>
+              <option value="same">{generator === "claude" ? `Same model (${genModel})` : `Default (${llm.data?.default_model ?? ""})`}</option>
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+              <option value="none">No judge (citation metrics only)</option>
+            </select>
+          </label>
+          <label className="inline-field">
+            <span>Passages</span>
+            <select className="select" value={k} onChange={(e) => setK(Number(e.target.value))}>
+              {[3, 5, 8, 12, 20].map((x) => (
+                <option key={x} value={x}>
+                  {x}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+      <div className="row" style={{ marginTop: 12 }}>
+        {kind === "answer" && (
+          <span className="xs muted" style={{ maxWidth: "62ch" }}>
+            One generation and up to two judge calls per question. Answers are cached, so rerunning the same setup is free.
+          </span>
+        )}
         <span className="spacer" />
-        <button type="button" className="btn primary" onClick={go} disabled={start.isPending || !chosen || n === 0 || fileErrors > 0}>
-          {start.isPending ? "Running…" : `Run eval on ${n} question${n === 1 ? "" : "s"}`}
+        <button type="button" className="btn primary" onClick={go} disabled={busy || !chosen || n === 0 || fileErrors > 0 || needsKey}>
+          {busy ? "Running…" : `Run ${kind === "answer" ? "answer eval" : "eval"} on ${n} question${n === 1 ? "" : "s"}`}
         </button>
       </div>
+      {needsKey && (
+        <p className="small" style={{ color: "var(--warn)", marginTop: 8 }}>
+          Claude needs ANTHROPIC_API_KEY set where the server runs. Without it, pick the extractive baseline with no judge.
+        </p>
+      )}
       {fileErrors > 0 && <p className="small" style={{ color: "var(--warn)", marginTop: 8 }}>questions.yaml has problems; fix them on the Questions tab first.</p>}
       {start.error && <div style={{ marginTop: 10 }}><ErrorBanner error={start.error} /></div>}
+      {jobId && <JobProgress id={jobId} onDone={finished} />}
     </section>
   );
 }
@@ -93,7 +225,7 @@ export function ResultsPage() {
       <div className="page-head">
         <div>
           <h1>Results</h1>
-          <p className="sub">Every eval run, from the app or the terminal. Each is a folder in corpus-builder/runs/.</p>
+          <p className="sub">Every eval run, from the app or the terminal. Each is a folder in data/runs/.</p>
         </div>
       </div>
       <RunEvalPanel />
@@ -127,8 +259,8 @@ export function ResultsPage() {
                   <th>Run</th>
                   <th>Setup</th>
                   <th className="num">Questions</th>
-                  <th className="num" title="Strict / lenient">Hit@5</th>
-                  <th className="num" title="Strict / lenient">MRR</th>
+                  <th className="num" title="Retrieval: Hit@5 strict / lenient. Answers: share judged correct">Hit@5 / Correct</th>
+                  <th className="num" title="Retrieval: MRR strict / lenient. Answers: share supported by its citations">MRR / Supported</th>
                   <th className="num hide-sm" title="Share of each top 10 you have judged">Judged</th>
                   <th className="hide-sm" />
                 </tr>
@@ -146,17 +278,15 @@ export function ResultsPage() {
                       <div className="paper-meta xs">{r.split} split</div>
                     </td>
                     <td className="small">
+                      <span className={`pill ${r.kind === "answer" ? "accent" : ""}`}>{r.kind === "answer" ? "Answers" : "Retrieval"}</span>{" "}
+                      {r.kind === "answer" && <>{r.generator?.model ?? "extractive"}, </>}
                       {r.retriever?.name} on {r.chunks}
                       {r.git_commit && <div className="xs muted">commit {r.git_commit}</div>}
                     </td>
                     <td className="num">{r.n_scored}</td>
-                    <td className="num">
-                      {n2(r.headline["hit@5"]?.strict)} <span className="muted">/ {n2(r.headline["hit@5"]?.lenient)}</span>
-                    </td>
-                    <td className="num">
-                      {n2(r.headline.mrr?.strict)} <span className="muted">/ {n2(r.headline.mrr?.lenient)}</span>
-                    </td>
-                    <td className="num hide-sm">{r.judged == null ? "" : `${Math.round(r.judged * 100)}%`}</td>
+                    <Headline r={r} m={r.kind === "answer" ? "correct" : "hit@5"} />
+                    <Headline r={r} m={r.kind === "answer" ? "supported" : "mrr"} />
+                    <td className="num hide-sm">{r.kind === "answer" || r.judged == null ? "" : `${Math.round(r.judged * 100)}%`}</td>
                     <td className="hide-sm" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
@@ -177,7 +307,7 @@ export function ResultsPage() {
               </tbody>
             </table>
           </div>
-          <p className="xs muted" style={{ marginTop: 8 }}>Scores are strict / lenient.</p>
+          <p className="xs muted" style={{ marginTop: 8 }}>Retrieval scores are strict / lenient. A dash means the run has no judge or no reference answers.</p>
         </>
       )}
     </div>

@@ -39,6 +39,7 @@ QUESTIONS = """# Header comment that must survive edits.
   type: lookup
   tags: [bp]
   split: dev
+  answer: Bulk silicon.
   evidence:
     - paper: W1
       quote: "the method for bulk silicon"   # inline comment (allowed to be lost)
@@ -74,5 +75,6 @@ def client(data_dir, tmp_path):
     settings = Settings.from_env(core_dir=real_core, corpus_dir=data_dir / "corpus",
                                  chunks_root=data_dir / "chunks",
                                  questions_file=data_dir / "questions" / "questions.yaml",
-                                 runs_dir=data_dir / "runs", web_dist=tmp_path / "no-dist")
+                                 runs_dir=data_dir / "runs", cache_dir=data_dir / "cache",
+                                 web_dist=tmp_path / "no-dist")
     return TestClient(create_app(settings))

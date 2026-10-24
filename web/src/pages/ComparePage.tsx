@@ -1,5 +1,6 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { useCompare } from "../api/hooks";
+import type { EvalCompare } from "../api/types";
 import { ErrorBanner } from "../components/ui";
 import { outcome } from "./ResultPage";
 import { when } from "./ResultsPage";
@@ -15,6 +16,26 @@ const METRICS: [string, string][] = [
   ["judged@10", "Judged"],
 ];
 
+const ANSWER_METRICS: [string, string][] = [
+  ["correct", "Correct"],
+  ["supported", "Supported by citations"],
+  ["cites_gold", "Cites your evidence"],
+  ["retrieved_gold", "Evidence retrieved"],
+  ["invalid_citations", "Invalid citations (lower is better)"],
+  ["abstained_when_unanswerable", "Declines unanswerable"],
+  ["abstained_when_answerable", "Declines answerable (lower is better)"],
+];
+
+type PerRun = EvalCompare["questions"][number]["per_run"][number];
+
+const answerText = (r: PerRun) => {
+  if (!r) return "not in this run";
+  if (r.unanswerable) return r.abstained ? "declined (right)" : "answered (wrong)";
+  if (r.abstained) return "declined";
+  return r.verdict ?? "not judged";
+};
+const isBad = (t: string) => ["incorrect", "declined", "answered (wrong)", "miss"].includes(t);
+
 const rankText = (r: { strict_rank: number | null; lenient_rank: number | null } | null) => {
   if (!r) return "not in this run";
   const o = outcome(r);
@@ -28,6 +49,14 @@ export function ComparePage() {
   const names = (params.get("names") ?? "").split(",").filter(Boolean);
   const cmp = useCompare(names);
   const c = cmp.data;
+  const answers = !!c && c.kinds.length === 1 && c.kinds[0] === "answer";
+  const mixed = !!c && c.kinds.length > 1;
+  const metrics = answers ? ANSWER_METRICS : METRICS;
+  const cellText = answers ? answerText : rankText;
+  const setup = (r: EvalCompare["runs"][number]) =>
+    r.kind === "answer"
+      ? `${r.generator?.model ?? "extractive"}, ${r.retriever?.name} top ${r.k}, ${r.split}`
+      : `${r.retriever?.name} on ${r.chunks}, ${r.split}`;
 
   return (
     <div className="page">
@@ -47,7 +76,10 @@ export function ComparePage() {
           their scores aren't directly comparable. To compare setups fairly, rerun them on the current questions.
         </div>
       )}
-      {c && (
+      {mixed && (
+        <div className="banner">You picked both retrieval and answer runs. They measure different things; compare runs of one kind.</div>
+      )}
+      {c && !mixed && (
         <>
           <div className="table-wrap">
             <table className="data static">
@@ -58,14 +90,14 @@ export function ComparePage() {
                     <th key={r.name}>
                       <Link to={`/results/${r.name}`}>{when(r.created)}</Link>
                       <div className="xs muted" style={{ fontWeight: 450 }}>
-                        {r.retriever?.name} on {r.chunks}, {r.split}
+                        {setup(r)}
                       </div>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {METRICS.filter(([m]) => c.runs.some((r) => r.results[m])).map(([m, label]) => (
+                {metrics.filter(([m]) => c.runs.some((r) => r.results[m])).map(([m, label]) => (
                   <tr key={m}>
                     <td>{label}</td>
                     {c.runs.map((r) => {
@@ -91,7 +123,9 @@ export function ComparePage() {
           <section className="section-block">
             <h2>Per question</h2>
             <p className="small muted" style={{ margin: "4px 0 10px" }}>
-              Rank of your original evidence in each run; "alt" means only an alternative made the top 10. Rows where the runs disagree are highlighted.
+              {answers
+                ? "The judge's verdict on each run's answer. Rows where the runs differ are highlighted."
+                : 'Rank of your original evidence in each run; "alt" means only an alternative made the top 10. Rows where the runs disagree are highlighted.'}
             </p>
             <div className="table-wrap">
               <table className="data static">
@@ -105,7 +139,7 @@ export function ComparePage() {
                 </thead>
                 <tbody>
                   {c.questions.map((q) => {
-                    const texts = q.per_run.map(rankText);
+                    const texts = q.per_run.map(cellText);
                     const changed = new Set(texts).size > 1;
                     return (
                       <tr key={q.id} className={changed ? "changed" : ""}>
@@ -116,7 +150,7 @@ export function ComparePage() {
                           <span className="small">{q.question}</span>
                         </td>
                         {texts.map((t, i) => (
-                          <td key={i} className={`small ${t === "miss" ? "rank-miss" : ""}`}>
+                          <td key={i} className={`small ${isBad(t) ? "rank-miss" : ""}`}>
                             {t}
                           </td>
                         ))}

@@ -1,0 +1,1 @@
+{"text": "{\"verdict\": \"correct\", \"reason\": \"Matches the reference: normalized exp(-\u03b2 \u0394U) weights, kinetic energy cancels in the Boltzmann ratio, and weights reduce to 1/N when \u03b8 equals the reference.\"}", "model": "claude-sonnet-5-5", "input_tokens": 643, "output_tokens": 82, "seconds": 1.228342171991244, "cached": false}

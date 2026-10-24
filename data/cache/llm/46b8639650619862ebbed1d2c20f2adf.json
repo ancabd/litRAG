@@ -1,0 +1,1 @@
+{"text": "{\"verdict\": \"supported\", \"reason\": \"The passage states that SchNet used rcut = 5 \u00c5 on Materials Project formation energies and discarded two examples that would include isolated atoms with that setting.\"}", "model": "claude-sonnet-5-5", "input_tokens": 1120, "output_tokens": 68, "seconds": 1.0987104760133661, "cached": false}

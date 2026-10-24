@@ -38,6 +38,8 @@ from urllib.parse import urlparse
 
 import requests
 
+import paths
+
 OPENALEX = "https://api.openalex.org"
 S2 = "https://api.semanticscholar.org/graph/v1/paper"
 USER_AGENT = "corpus-builder/0.1 (literature corpus tool for a RAG project)"
@@ -696,7 +698,7 @@ def build(seed_lines: list[str], out: Path, *, api_key: str | None = None, max_c
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("seeds", type=Path, help="text file: one DOI, arXiv id (arxiv:XXXX), OpenAlex id or title per line")
-    ap.add_argument("--out", type=Path, default=Path("corpus"), help="output folder (default: corpus)")
+    ap.add_argument("--out", type=Path, default=paths.CORPUS, help=f"output folder (default: {paths.CORPUS})")
     ap.add_argument("--api-key", default=os.environ.get("OPENALEX_API_KEY"),
                     help="OpenAlex API key (default: $OPENALEX_API_KEY)")
     ap.add_argument("--max-citing", type=int, default=50,

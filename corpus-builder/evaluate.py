@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
-"""Retrieval evaluation.
+"""Retrieval and answer evaluation.
 
   check    validate a question file and show where each evidence quote lands in the chunks
   search   run one query and print the top chunks (useful while writing questions)
-  run      score a retriever on the questions; writes runs/<name>/report.md
+  run      score a retriever on the questions; writes data/runs/<name>/report.md
+  ask      answer one question from the corpus, with citations (needs ANTHROPIC_API_KEY)
+  answer   answer eval: generate answers for the questions and judge them
   compare  put several runs side by side
 
 Examples:
   python evaluate.py check
   python evaluate.py search "radial symmetry function cutoff"
   python evaluate.py run
-  python evaluate.py compare runs/A runs/B
+  python evaluate.py ask "What test system did Behler and Parrinello use?"
+  python evaluate.py answer                         # claude-sonnet-5-5 answers, judged by the same model
+  python evaluate.py answer --generator extractive --judge none     # no API key needed
+  python evaluate.py compare data/runs/A data/runs/B
 """
 from __future__ import annotations
 
@@ -19,13 +24,14 @@ import sys
 import textwrap
 from pathlib import Path
 
+import paths
 from evaluation.matching import GoldIndex
 from evaluation.questions import QuestionFileError, load_questions
 from evaluation.runner import DEFAULT_KS, compare_runs, run_eval
 from retrieval import available, get_retriever, load_chunks
 
-DEFAULT_QUESTIONS = Path("questions/questions.yaml")
-DEFAULT_CHUNKS = Path("chunks/pymupdf_w400_o60")
+DEFAULT_QUESTIONS = paths.QUESTIONS
+DEFAULT_CHUNKS = paths.default_chunk_run()
 
 
 def cmd_check(args) -> int:
@@ -108,6 +114,65 @@ def cmd_run(args) -> int:
     return 0
 
 
+def _generator(args):
+    from generation import get_generator
+    return get_generator(args.generator, model=args.model, cache_dir=None if args.no_cache else paths.CACHE / "llm")
+
+
+def cmd_ask(args) -> int:
+    from generation import LLMNotConfigured, answer_question
+    chunks = load_chunks(args.chunks)
+    r = get_retriever(args.retriever)
+    r.index(chunks)
+    try:
+        gen = _generator(args)
+    except LLMNotConfigured as exc:
+        print(exc)
+        return 2
+    ans = answer_question(args.question, r, {c["chunk_id"]: c for c in chunks}, gen, k=args.k)
+    by_id = {c["chunk_id"]: c for c in chunks}
+    print(textwrap.fill(ans.answer, 100) if ans.answerable else f"Not answerable from the corpus. {ans.answer}")
+    if ans.citations:
+        print("\nSources:")
+        for i, cid in enumerate(ans.citations, 1):
+            c = by_id[cid]
+            print(f"  [{cid}] {c.get('title')} ({c.get('year')}), {c['section']}")
+    for w in ans.warnings:
+        print(f"note: {w}")
+    cost = f", ${ans.cost:.4f}" if ans.cost else ""
+    print(f"\n{ans.generator.get('model') or ans.generator['name']}, {ans.seconds:.1f}s"
+          f"{', cached' if ans.cached else ''}{cost}", file=sys.stderr)
+    return 0
+
+
+def cmd_answer(args) -> int:
+    from evaluation.answer_runner import run_answer_eval
+    from evaluation.judge import Judge
+    from generation import LLMNotConfigured
+    from generation.llm import make_llm
+    try:
+        gen = _generator(args)
+        judge = None if args.judge == "none" else Judge(make_llm(args.judge, None if args.no_cache else paths.CACHE / "llm"))
+    except LLMNotConfigured as exc:
+        print(exc)
+        return 2
+
+    def progress(done, total):
+        print(f"\r  {done}/{total} questions", end="", file=sys.stderr, flush=True)
+
+    try:
+        run_dir = run_answer_eval(args.questions, args.chunks, gen, judge, args.retriever,
+                                  None if args.split == "all" else args.split, args.k, args.out,
+                                  name=args.name, progress=progress)
+    except QuestionFileError as exc:
+        print(f"Question file has errors:\n{exc}")
+        return 1
+    print(file=sys.stderr)
+    print((run_dir / "report.md").read_text())
+    print(f"Run saved to {run_dir}", file=sys.stderr)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -135,8 +200,30 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--split", default="dev", choices=["dev", "test", "all"])
     r.add_argument("-k", default=",".join(map(str, DEFAULT_KS)), help="cutoffs, e.g. 1,5,10,20")
     r.add_argument("--threshold", type=float, default=0.5)
-    r.add_argument("--out", type=Path, default=Path("runs"))
+    r.add_argument("--out", type=Path, default=paths.RUNS)
     r.add_argument("--name", default=None, help="run folder name (default: timestamp + config)")
+
+    from generation.llm import DEFAULT_MODEL
+
+    def gen_args(p):
+        p.add_argument("--retriever", default="bm25", choices=available())
+        p.add_argument("-k", type=int, default=8, help="passages given to the generator (default: 8)")
+        p.add_argument("--generator", default="claude", choices=["claude", "extractive"])
+        p.add_argument("--model", default=DEFAULT_MODEL, help=f"generator model (default: {DEFAULT_MODEL})")
+        p.add_argument("--no-cache", action="store_true", help="always call the model (default: reuse cached responses)")
+
+    a = sub.add_parser("ask", help="answer one question from the corpus")
+    common(a, questions=False)
+    a.add_argument("question")
+    gen_args(a)
+
+    an = sub.add_parser("answer", help="answer eval: generate and judge answers")
+    common(an)
+    gen_args(an)
+    an.add_argument("--judge", default=DEFAULT_MODEL, help=f"judge model, or 'none' (default: {DEFAULT_MODEL})")
+    an.add_argument("--split", default="dev", choices=["dev", "test", "all"])
+    an.add_argument("--out", type=Path, default=paths.RUNS)
+    an.add_argument("--name", default=None)
 
     cp = sub.add_parser("compare", help="compare runs")
     cp.add_argument("runs", nargs="+", type=Path)
@@ -145,7 +232,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "compare":
         print(compare_runs(args.runs))
         return 0
-    return {"check": cmd_check, "search": cmd_search, "run": cmd_run}[args.cmd](args)
+    return {"check": cmd_check, "search": cmd_search, "run": cmd_run, "ask": cmd_ask, "answer": cmd_answer}[args.cmd](args)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import { useEval } from "../api/hooks";
 import type { EvalHit, EvalQuestion, Interval } from "../api/types";
 import { ScoreChart } from "../components/ScoreChart";
 import { ErrorBanner, Highlighted, pages, Seg, TYPE_LABEL } from "../components/ui";
+import { AnswerRun } from "./AnswerRun";
 import { when } from "./ResultsPage";
 
 const HEADLINE = ["hit@1", "hit@5", "hit@10", "recall@10", "mrr", "ndcg@10", "paper_hit@10"];
@@ -36,12 +37,12 @@ const KIND_LABEL: Record<string, string> = {
   unjudged: "Not reviewed",
 };
 
-function Hit({ h }: { h: EvalHit }) {
+export function Hit({ h, anchor, citedAs }: { h: EvalHit; anchor?: string; citedAs?: number }) {
   const [open, setOpen] = useState(false);
   const k = h.label.kind;
   return (
-    <li className={`hit hit-${k}`}>
-      <span className="hit-rank">#{h.rank}</span>
+    <li className={`hit hit-${k}`} id={anchor}>
+      <span className="hit-rank">{citedAs ? <span className="cite big" title="Cited in the answer">{citedAs}</span> : `#${h.rank}`}</span>
       <div className="hit-body">
         <div className="row" style={{ gap: 6 }}>
           <span className={`pill ${k === "evidence" ? "ok" : k === "alternative" ? "accent" : ""}`}>{KIND_LABEL[k]}</span>
@@ -115,6 +116,7 @@ export function ResultPage() {
     );
   const r = run.data;
   if (!r) return null;
+  if (r.kind === "answer") return <AnswerRun r={r} />;
   const results = r.summary.results;
   const all = results.all ?? {};
   const judged: Interval | undefined = all["judged@10"];

@@ -1,0 +1,1 @@
+{"text": "{\"answerable\": true, \"answer\": \"SchNet used a distance cutoff of rcut = 5 \u00c5 when learning formation energies of bulk crystals from the Materials Project data [W2778051509#014].\"}", "model": "claude-haiku-5-5", "input_tokens": 6454, "output_tokens": 70, "seconds": 0.9207459219906013, "cached": false}

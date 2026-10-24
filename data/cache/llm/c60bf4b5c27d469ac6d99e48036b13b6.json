@@ -1,0 +1,1 @@
+{"text": "{\"verdict\": \"correct\", \"reason\": \"The answer gives the 5 \u00c5 cutoff on Materials Project data, matching the key fact in the reference; it omits the dropped structures and the QM9/MD17 note, which are minor details.\"}", "model": "claude-sonnet-5-5", "input_tokens": 388, "output_tokens": 79, "seconds": 1.4348904530052096, "cached": false}
