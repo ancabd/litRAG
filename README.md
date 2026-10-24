@@ -1,6 +1,6 @@
 # litrag
 
-Agentic RAG over the literature on machine-learned interatomic potentials and biomolecular simulation, with an evaluation harness and a web app.
+Agentic RAG over academic literature (tested on machine-learned interatomic potentials and biomolecular simulation), with an evaluation harness and a web app.
 
 ```
 litrag/
