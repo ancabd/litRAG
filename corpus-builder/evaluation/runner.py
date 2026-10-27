@@ -14,7 +14,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from retrieval import get_retriever, load_chunks
+from retrieval import build_retriever, load_chunks, slug
 
 from .matching import GoldIndex
 from .metrics import aggregate, question_metrics
@@ -60,9 +60,9 @@ def run_eval(questions_path: Path, chunks_path: Path, retriever_name: str = "bm2
     chunk_by_id = {c["chunk_id"]: c for c in chunks}
     gold = GoldIndex(chunks, threshold=threshold)
 
-    retriever = get_retriever(retriever_name, **(retriever_options or {}))
+    chunks_dir = Path(chunks_path) if Path(chunks_path).is_dir() else Path(chunks_path).parent
     t_index = time.perf_counter()
-    retriever.index(chunks)
+    retriever = build_retriever(retriever_name, chunks, chunks_dir / "embeddings", **(retriever_options or {}))
     index_seconds = time.perf_counter() - t_index
 
     rows, excluded, query_times = [], [], []
@@ -103,7 +103,7 @@ def run_eval(questions_path: Path, chunks_path: Path, retriever_name: str = "bm2
     chunks_dir = Path(chunks_path) if Path(chunks_path).is_dir() else Path(chunks_path).parent
     chunk_run = chunks_dir / "run.json"
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    run_dir = (out_root / (name or f"{stamp}_{retriever_name}_{chunks_dir.name}_{split or 'all'}")).resolve()
+    run_dir = (out_root / (name or f"{stamp}_{slug(retriever_name)}_{chunks_dir.name}_{split or 'all'}")).resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
 
     summary = {

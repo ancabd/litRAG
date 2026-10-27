@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from ..core import QuestionFileError, available_retrievers
+from ..core import QuestionFileError, is_retriever
 from ..deps import Services, require_run, services
 from ..services.evidence import check_evidence, chunk_view, evidence_summary, judge, judgments
 from ..services.questions import NotFound, VersionConflict
@@ -152,7 +152,7 @@ def _find(svc: Services, qid: str) -> tuple[dict, str]:
 @router.get("/questions/{qid}/review")
 def review(qid: str, run: str | None = None, retriever: str = "bm25", k: int = 10,
            svc: Services = Depends(services)) -> dict:
-    if retriever not in available_retrievers():
+    if not is_retriever(retriever):
         raise HTTPException(400, f"Unknown retriever {retriever!r}")
     q, version = _find(svc, qid)
     data = require_run(svc, run)

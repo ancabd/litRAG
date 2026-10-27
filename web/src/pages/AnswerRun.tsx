@@ -1,5 +1,6 @@
 // One answer-eval run: scores, how far the judge agrees with you, and every generated answer.
 import { useState } from "react";
+import { retrieverLabel } from "../components/RetrieverSelect";
 import { Link } from "react-router-dom";
 import { useSetVerdict } from "../api/hooks";
 import type { EvalDetail, EvalQuestion, Verdict } from "../api/types";
@@ -157,8 +158,8 @@ export function AnswerRun({ r }: { r: EvalDetail }) {
           <h1>Answer eval, {when(r.created)}</h1>
           <p className="sub">
             {r.generator?.name === "agent"
-              ? `Agent (${r.generator.model}) searching ${r.retriever?.name} on ${r.chunks}, ${r.k} passages per search,`
-              : `${r.generator?.model ?? "Extractive baseline"} answering from the top ${r.k} passages of ${r.retriever?.name} on ${r.chunks},`}{" "}
+              ? `Agent (${r.generator.model}) searching ${retrieverLabel(r.retriever)} on ${r.chunks}, ${r.k} passages per search,`
+              : `${r.generator?.model ?? "Extractive baseline"} answering from the top ${r.k} passages of ${retrieverLabel(r.retriever)} on ${r.chunks},`}{" "}
             {r.split ?? "all"} split, {r.n_scored} questions.{" "}
             {r.judge ? `Judged by ${r.judge.model}.` : "No judge, so only the citation metrics are scored."}
             {cost > 0 && ` Cost $${cost.toFixed(3)}.`}

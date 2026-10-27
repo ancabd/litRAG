@@ -25,6 +25,7 @@ from pathlib import Path
 
 from generation.answer import Generator
 from library import Library
+from retrieval import slug
 
 from .judge import Judge
 from .matching import GoldIndex
@@ -44,7 +45,7 @@ EFFORT = ["turns", "tool_calls", "searches", "passages_read", "input_tokens", "o
 def effort_of(ans) -> dict:
     """How much work one answer took: model calls, tool calls, passages read, tokens, cost, time."""
     steps = ans.trace or []
-    tools = [s for s in steps if s["action"] not in ("answer", "give_up")]
+    tools = [s for s in steps if s["action"] not in ("answer", "give_up", "refused")]
     return {
         "turns": sum(1 for s in steps if s.get("input_tokens")),  # one per model call
         "tool_calls": len(tools),
@@ -54,7 +55,7 @@ def effort_of(ans) -> dict:
         "cache_read_tokens": ans.cache_read_tokens,
         "cost": ans.cost, "seconds": ans.seconds,
         "gave_up": any(s["action"] == "give_up" for s in steps),
-        "hit_budget": any("budget" in w for w in ans.warnings),
+        "hit_budget": any("budget" in w for w in ans.warnings) or any(s["action"] == "refused" for s in steps),
     }
 
 
@@ -164,7 +165,7 @@ def run_answer_eval(questions_path: Path, chunks_path: Path, generator: Generato
     gen_name = cfg.get("model") or cfg["name"]
     if cfg["name"] != "claude" and cfg.get("model"):
         gen_name = f"{cfg['name']}-{cfg['model']}"  # e.g. agent-claude-haiku-5-5
-    run_dir = (Path(out_root) / (name or f"{stamp}_answers_{gen_name}_{retriever_name}_{chunks_dir.name}_{split or 'all'}")).resolve()
+    run_dir = (Path(out_root) / (name or f"{stamp}_answers_{gen_name}_{slug(retriever_name)}_{chunks_dir.name}_{split or 'all'}")).resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
     no_reference = [r["id"] for r in rows if r["type"] != "unanswerable" and not r["reference"]]
     chunk_run = chunks_dir / "run.json"

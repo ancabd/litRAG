@@ -1,0 +1,655 @@
+{
+  "kind": "answer",
+  "created": "2026-10-27T15:24:16+00:00",
+  "git_commit": "ddd18aa-dirty",
+  "questions_file": "/home/anca/Documents/RAG-project/litrag/data/questions/questions.yaml",
+  "questions_sha1": "487184e30344",
+  "split": "dev",
+  "chunks": "/home/anca/Documents/RAG-project/litrag/data/chunks/pymupdf_w400_o60",
+  "chunks_config": {
+    "parser": "pymupdf@2",
+    "chunking": {
+      "size": 400,
+      "overlap": 60,
+      "min_words": 40
+    },
+    "chunks": 5592,
+    "papers_by_source": {
+      "abstract": 158,
+      "skipped": 18,
+      "pdf": 136,
+      "abstract_fallback": 1
+    }
+  },
+  "retriever": {
+    "name": "hybrid",
+    "fusion": "rrf",
+    "k_rrf": 60,
+    "candidates": 100,
+    "bm25": {
+      "name": "bm25",
+      "k1": 1.2,
+      "b": 0.75,
+      "include_title": true,
+      "include_section": true
+    },
+    "dense": {
+      "name": "dense",
+      "model": "BAAI/bge-small-en-v1.5",
+      "preset": "bge-small",
+      "query_prefix": "Represent this sentence for searching relevant passages: ",
+      "doc_prefix": "",
+      "max_tokens": 512,
+      "text": "title - section + chunk"
+    }
+  },
+  "k": 5,
+  "generator": {
+    "name": "claude",
+    "provider": "anthropic",
+    "model": "claude-haiku-5-5",
+    "prompt": "answer-v1"
+  },
+  "judge": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5-5",
+    "prompt": "judge-v1"
+  },
+  "n_questions": 32,
+  "n_scored": 32,
+  "no_reference_answer": [],
+  "excluded": [],
+  "results": {
+    "all": {
+      "correct": {
+        "mean": 0.6964285714285714,
+        "lo": 0.5535714285714286,
+        "hi": 0.8392857142857143,
+        "n": 28
+      },
+      "supported": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 9
+      },
+      "cites_gold": {
+        "mean": 0.72,
+        "lo": 0.52,
+        "hi": 0.88,
+        "n": 25
+      },
+      "retrieved_gold": {
+        "mean": 0.6666666666666666,
+        "lo": 0.48148148148148145,
+        "hi": 0.8518518518518519,
+        "n": 27
+      },
+      "invalid_citations": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 27
+      },
+      "abstained_when_unanswerable": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 3
+      },
+      "abstained_when_answerable": {
+        "mean": 0.06896551724137931,
+        "lo": 0.0,
+        "hi": 0.1724137931034483,
+        "n": 29
+      }
+    },
+    "retrieval:found": {
+      "correct": {
+        "mean": 0.9117647058823529,
+        "lo": 0.8235294117647058,
+        "hi": 1.0,
+        "n": 17
+      },
+      "supported": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 4
+      },
+      "cites_gold": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 18
+      },
+      "retrieved_gold": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 18
+      },
+      "invalid_citations": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 18
+      },
+      "abstained_when_answerable": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 18
+      }
+    },
+    "retrieval:missed": {
+      "correct": {
+        "mean": 0.3888888888888889,
+        "lo": 0.16666666666666666,
+        "hi": 0.6666666666666666,
+        "n": 9
+      },
+      "supported": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 3
+      },
+      "cites_gold": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 7
+      },
+      "retrieved_gold": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 9
+      },
+      "invalid_citations": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 7
+      },
+      "abstained_when_answerable": {
+        "mean": 0.2222222222222222,
+        "lo": 0.0,
+        "hi": 0.5555555555555556,
+        "n": 9
+      }
+    },
+    "tag:behler-parrinello": {
+      "correct": {
+        "mean": 0.7,
+        "lo": 0.3,
+        "hi": 1.0,
+        "n": 5
+      },
+      "cites_gold": {
+        "mean": 0.8,
+        "lo": 0.4,
+        "hi": 1.0,
+        "n": 5
+      },
+      "retrieved_gold": {
+        "mean": 0.6666666666666666,
+        "lo": 0.3333333333333333,
+        "hi": 1.0,
+        "n": 6
+      },
+      "invalid_citations": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 5
+      },
+      "abstained_when_answerable": {
+        "mean": 0.16666666666666666,
+        "lo": 0.0,
+        "hi": 0.5,
+        "n": 6
+      }
+    },
+    "tag:charmm": {
+      "correct": {
+        "mean": 0.25,
+        "lo": 0.0,
+        "hi": 0.5,
+        "n": 2
+      },
+      "supported": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 2
+      },
+      "invalid_citations": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 2
+      },
+      "abstained_when_answerable": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 2
+      }
+    },
+    "tag:definition": {
+      "correct": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 5
+      },
+      "supported": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 1
+      },
+      "cites_gold": {
+        "mean": 0.8,
+        "lo": 0.4,
+        "hi": 1.0,
+        "n": 5
+      },
+      "retrieved_gold": {
+        "mean": 0.8,
+        "lo": 0.4,
+        "hi": 1.0,
+        "n": 5
+      },
+      "invalid_citations": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 5
+      },
+      "abstained_when_answerable": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 5
+      }
+    },
+    "tag:difftre": {
+      "correct": {
+        "mean": 0.9444444444444444,
+        "lo": 0.8333333333333334,
+        "hi": 1.0,
+        "n": 9
+      },
+      "supported": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 1
+      },
+      "cites_gold": {
+        "mean": 0.9,
+        "lo": 0.7,
+        "hi": 1.0,
+        "n": 10
+      },
+      "retrieved_gold": {
+        "mean": 0.9,
+        "lo": 0.7,
+        "hi": 1.0,
+        "n": 10
+      },
+      "invalid_citations": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 10
+      },
+      "abstained_when_unanswerable": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 1
+      },
+      "abstained_when_answerable": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 10
+      }
+    },
+    "tag:equation": {
+      "correct": {
+        "mean": 0.75,
+        "lo": 0.4166666666666667,
+        "hi": 1.0,
+        "n": 6
+      },
+      "supported": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 2
+      },
+      "cites_gold": {
+        "mean": 0.5,
+        "lo": 0.16666666666666666,
+        "hi": 0.8333333333333334,
+        "n": 6
+      },
+      "retrieved_gold": {
+        "mean": 0.5,
+        "lo": 0.16666666666666666,
+        "hi": 0.8333333333333334,
+        "n": 6
+      },
+      "invalid_citations": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 6
+      },
+      "abstained_when_answerable": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 6
+      }
+    },
+    "tag:force-fields": {
+      "correct": {
+        "mean": 0.25,
+        "lo": 0.0,
+        "hi": 0.5,
+        "n": 2
+      },
+      "supported": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 2
+      },
+      "invalid_citations": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 2
+      },
+      "abstained_when_answerable": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 2
+      }
+    },
+    "tag:nequip": {
+      "correct": {
+        "mean": 0.5,
+        "lo": 0.21428571428571427,
+        "hi": 0.7857142857142857,
+        "n": 7
+      },
+      "supported": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 1
+      },
+      "cites_gold": {
+        "mean": 0.6666666666666666,
+        "lo": 0.3333333333333333,
+        "hi": 1.0,
+        "n": 6
+      },
+      "retrieved_gold": {
+        "mean": 0.5714285714285714,
+        "lo": 0.14285714285714285,
+        "hi": 0.8571428571428571,
+        "n": 7
+      },
+      "invalid_citations": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 6
+      },
+      "abstained_when_answerable": {
+        "mean": 0.14285714285714285,
+        "lo": 0.0,
+        "hi": 0.42857142857142855,
+        "n": 7
+      }
+    },
+    "tag:numeric": {
+      "correct": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 3
+      },
+      "supported": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 1
+      },
+      "cites_gold": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 3
+      },
+      "retrieved_gold": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 3
+      },
+      "invalid_citations": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 3
+      },
+      "abstained_when_answerable": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 3
+      }
+    },
+    "tag:out-of-scope": {
+      "abstained_when_unanswerable": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 1
+      }
+    },
+    "tag:schnet": {
+      "correct": {
+        "mean": 0.7222222222222222,
+        "lo": 0.4444444444444444,
+        "hi": 1.0,
+        "n": 9
+      },
+      "supported": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 4
+      },
+      "cites_gold": {
+        "mean": 0.625,
+        "lo": 0.25,
+        "hi": 0.875,
+        "n": 8
+      },
+      "retrieved_gold": {
+        "mean": 0.5555555555555556,
+        "lo": 0.2222222222222222,
+        "hi": 0.8888888888888888,
+        "n": 9
+      },
+      "invalid_citations": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 8
+      },
+      "abstained_when_unanswerable": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 1
+      },
+      "abstained_when_answerable": {
+        "mean": 0.1111111111111111,
+        "lo": 0.0,
+        "hi": 0.3333333333333333,
+        "n": 9
+      }
+    },
+    "type:comparison": {
+      "correct": {
+        "mean": 0.6,
+        "lo": 0.3,
+        "hi": 0.9,
+        "n": 5
+      },
+      "cites_gold": {
+        "mean": 0.75,
+        "lo": 0.25,
+        "hi": 1.0,
+        "n": 4
+      },
+      "retrieved_gold": {
+        "mean": 0.6,
+        "lo": 0.2,
+        "hi": 1.0,
+        "n": 5
+      },
+      "invalid_citations": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 4
+      },
+      "abstained_when_answerable": {
+        "mean": 0.2,
+        "lo": 0.0,
+        "hi": 0.6,
+        "n": 5
+      }
+    },
+    "type:lookup": {
+      "correct": {
+        "mean": 0.7142857142857143,
+        "lo": 0.5476190476190477,
+        "hi": 0.8809523809523809,
+        "n": 21
+      },
+      "supported": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 9
+      },
+      "cites_gold": {
+        "mean": 0.6666666666666666,
+        "lo": 0.4444444444444444,
+        "hi": 0.8888888888888888,
+        "n": 18
+      },
+      "retrieved_gold": {
+        "mean": 0.631578947368421,
+        "lo": 0.42105263157894735,
+        "hi": 0.8421052631578947,
+        "n": 19
+      },
+      "invalid_citations": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 20
+      },
+      "abstained_when_answerable": {
+        "mean": 0.047619047619047616,
+        "lo": 0.0,
+        "hi": 0.14285714285714285,
+        "n": 21
+      }
+    },
+    "type:multihop": {
+      "correct": {
+        "mean": 0.75,
+        "lo": 0.5,
+        "hi": 1.0,
+        "n": 2
+      },
+      "cites_gold": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 3
+      },
+      "retrieved_gold": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 3
+      },
+      "invalid_citations": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 3
+      },
+      "abstained_when_answerable": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 3
+      }
+    },
+    "type:unanswerable": {
+      "abstained_when_unanswerable": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 3
+      }
+    }
+  },
+  "effort": {
+    "turns": 1.0,
+    "tool_calls": 1.0,
+    "searches": 1.0,
+    "passages_read": 5.0,
+    "input_tokens": 3661.25,
+    "output_tokens": 417.1875,
+    "cache_read_tokens": 0.0,
+    "cost": 0.00057471875,
+    "seconds": 2.60890625,
+    "total_cost": 0.0184,
+    "gave_up": 0.0,
+    "hit_budget": 0.0
+  },
+  "usage": {
+    "generator": {
+      "input_tokens": 117160,
+      "output_tokens": 13350,
+      "cost": 0.0184
+    },
+    "judge": {
+      "input_tokens": 71089,
+      "output_tokens": 9899,
+      "cost": 0.2412
+    }
+  },
+  "timing": {
+    "total_seconds": 218.6
+  }
+}

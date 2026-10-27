@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..core import available_retrievers
+from ..core import is_retriever
 from ..deps import Services, require_run, services
 from ..services.evidence import chunk_view
 
@@ -13,8 +13,8 @@ router = APIRouter(tags=["search"])
 @router.get("/search")
 def search(q: str = Query(..., min_length=1), run: str | None = None, retriever: str = "bm25",
            k: int = Query(10, ge=1, le=100), paper: str | None = None, svc: Services = Depends(services)) -> dict:
-    if retriever not in available_retrievers():
-        raise HTTPException(400, f"Unknown retriever {retriever!r}; available: {available_retrievers()}")
+    if not is_retriever(retriever):
+        raise HTTPException(400, f"Unknown retriever {retriever!r}; try bm25, dense or hybrid")
     data = require_run(svc, run)
     hits = data.search(q, k=k, retriever=retriever, paper=paper)
     titles = svc.corpus.titles()

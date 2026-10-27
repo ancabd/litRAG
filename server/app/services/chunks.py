@@ -19,8 +19,8 @@ RUN_NAME = re.compile(r"^[A-Za-z0-9_.@-]+$")
 class RunData(Library):
     """A chunk run as the server holds it: the core Library plus the file time it was loaded from."""
 
-    def __init__(self, name: str, mtime: float, chunks: list[dict], info: dict | None):
-        super().__init__(chunks, name=name, info=info)
+    def __init__(self, name: str, mtime: float, chunks: list[dict], info: dict | None, path: Path | None = None):
+        super().__init__(chunks, name=name, info=info, path=path)
         self.mtime = mtime
 
 
@@ -63,7 +63,7 @@ class ChunkService:
         with self._lock:
             run = self._runs.get(name)
             if run is None or run.mtime != mtime:
-                run = RunData(name, mtime, load_chunks(f), _read_json(self.root / name / "run.json"))
+                run = RunData(name, mtime, load_chunks(f), _read_json(self.root / name / "run.json"), self.root / name)
                 self._runs[name] = run
             return run
 

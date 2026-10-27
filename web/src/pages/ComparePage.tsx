@@ -1,3 +1,4 @@
+import { retrieverLabel } from "../components/RetrieverSelect";
 import { Link, useSearchParams } from "react-router-dom";
 import { useCompare } from "../api/hooks";
 import type { Effort, EvalCompare, PairedDiff } from "../api/types";
@@ -136,8 +137,8 @@ export function ComparePage() {
   const cellText = answers ? answerText : rankText;
   const setup = (r: EvalCompare["runs"][number]) =>
     r.kind === "answer"
-      ? `${r.generator?.name === "agent" ? `agent (${r.generator.model})` : r.generator?.model ?? "extractive"}, ${r.retriever?.name} top ${r.k}, ${r.split}`
-      : `${r.retriever?.name} on ${r.chunks}, ${r.split}`;
+      ? `${r.generator?.name === "agent" ? `agent (${r.generator.model})` : r.generator?.model ?? "extractive"}, ${retrieverLabel(r.retriever)} top ${r.k}, ${r.split}`
+      : `${retrieverLabel(r.retriever)} on ${r.chunks}, ${r.split}`;
 
   return (
     <div className="page">

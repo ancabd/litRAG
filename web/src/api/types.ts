@@ -34,6 +34,7 @@ export interface Meta {
   runs: RunInfo[];
   default_run: string | null;
   retrievers: string[];
+  retriever_choices: { name: string; label: string }[];
   questions: { types: QuestionType[]; splits: Split[]; tags: string[]; count: number };
   paths: Record<string, string>;
 }
@@ -372,4 +373,21 @@ export interface Job {
   result: { name: string } | null;
   error: string | null;
   details: string[];
+  meta?: Record<string, string>;
+}
+
+export interface EmbeddingIndex {
+  model: string; // preset: "nomic", "bge-small"
+  model_id: string;
+  note: string;
+  chunks: number;
+  embedded: number;
+  ready: boolean;
+  job: Job | null; // a build in progress
+}
+
+export interface IndexStatus {
+  run: string;
+  installed: boolean;
+  models: EmbeddingIndex[];
 }

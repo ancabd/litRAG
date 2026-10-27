@@ -6,12 +6,18 @@
   run      score a retriever on the questions; writes data/runs/<name>/report.md
   ask      answer one question from the corpus, with citations (needs ANTHROPIC_API_KEY)
   answer   answer eval: generate answers for the questions and judge them
+  index    build (and cache) the embeddings for dense / hybrid retrieval, with progress
   compare  put several runs side by side
+
+Retrievers: bm25 (default), dense, dense:bge-small, hybrid, hybrid:bge-small  (dense needs
+requirements-dense.txt; the first use of a model embeds the corpus, later uses read the cache)
 
 Examples:
   python evaluate.py check
   python evaluate.py search "radial symmetry function cutoff"
   python evaluate.py run
+  python evaluate.py index --retriever dense            # embed the corpus once (a few minutes on a CPU)
+  python evaluate.py run --retriever hybrid
   python evaluate.py ask "What test system did Behler and Parrinello use?"
   python evaluate.py ask --generator agent "Which cutoff radius does NequIP use, and how does it compare to SchNet?"
   python evaluate.py answer                         # claude-sonnet-5-5 answers, judged by the same model
@@ -30,7 +36,8 @@ import paths
 from evaluation.matching import GoldIndex
 from evaluation.questions import QuestionFileError, load_questions
 from evaluation.runner import DEFAULT_KS, compare_runs, run_eval
-from retrieval import available, load_chunks
+from retrieval import choices as retriever_choices
+from retrieval import is_known, load_chunks
 
 DEFAULT_QUESTIONS = paths.QUESTIONS
 DEFAULT_CHUNKS = paths.default_chunk_run()
@@ -98,6 +105,47 @@ def cmd_search(args) -> int:
         print(f"\n#{h.rank}  {h.score:.2f}  {c['chunk_id']}  {(c.get('title') or '')[:70]} ({c.get('year')})")
         print(f"     {c['section'][:80]}  [{pages}]")
         print(textwrap.indent(textwrap.fill(c["text"][:args.chars], 100), "     "))
+    return 0
+
+
+def retriever_name(value: str) -> str:
+    """argparse type: any registered retriever, with an optional model after a colon."""
+    if not is_known(value):
+        names = ", ".join(c["name"] for c in retriever_choices())
+        raise argparse.ArgumentTypeError(f"unknown retriever {value!r} (try: {names}, or dense:<huggingface id>)")
+    return value
+
+
+def cmd_index(args) -> int:
+    from library import Library
+    from retrieval import build_retriever
+    import time
+    library = Library.load(args.chunks)
+
+    def progress(done, total):
+        print(f"\r  embedded {done}/{total} chunks", end="", file=sys.stderr, flush=True)
+
+    t0 = time.perf_counter()
+    try:
+        r = build_retriever(args.retriever, library.chunks, library.embeddings_dir, progress=progress)
+    except RuntimeError as exc:
+        print(exc)
+        return 2
+    print(file=sys.stderr)
+    dense = getattr(r, "dense", r)
+    st = getattr(r, "stats", {}) or {}
+    print(f"{args.retriever} on {library.name}: {st.get('chunks', len(library))} chunks, "
+          f"{st.get('embedded_now', 0)} embedded now, {st.get('from_cache', 0)} from the cache, "
+          f"{time.perf_counter() - t0:.0f}s")
+    if hasattr(dense, "truncated"):
+        n = dense.truncated(library.chunks)
+        if n:
+            print(f"note: {n} of {len(library)} chunks are longer than {dense.preset.max_tokens} tokens; "
+                  "the model only reads their beginning (a smaller chunk size avoids this)")
+    if args.query:
+        for h in library.search(args.query, k=5, retriever=args.retriever):
+            c = library.chunk(h.chunk_id)
+            print(f"  #{h.rank} {h.score:.3f} {c['chunk_id']} {(c.get('title') or '')[:60]}")
     return 0
 
 
@@ -229,14 +277,14 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("search", help="query the chunks")
     common(s, questions=False)
     s.add_argument("query")
-    s.add_argument("--retriever", default="bm25", choices=available())
+    s.add_argument("--retriever", default="bm25", type=retriever_name, help="bm25, dense, dense:bge-small, hybrid, hybrid:bge-small")
     s.add_argument("-k", type=int, default=5)
     s.add_argument("--chars", type=int, default=400, help="characters of each chunk to show")
     s.add_argument("--paper", help="only search this paper (OpenAlex id)")
 
     r = sub.add_parser("run", help="score a retriever")
     common(r)
-    r.add_argument("--retriever", default="bm25", choices=available())
+    r.add_argument("--retriever", default="bm25", type=retriever_name, help="bm25, dense, dense:bge-small, hybrid, hybrid:bge-small")
     r.add_argument("--split", default="dev", choices=["dev", "test", "all"])
     r.add_argument("-k", default=",".join(map(str, DEFAULT_KS)), help="cutoffs, e.g. 1,5,10,20")
     r.add_argument("--threshold", type=float, default=0.5)
@@ -247,7 +295,7 @@ def main(argv: list[str] | None = None) -> int:
     from generation.llm import DEFAULT_MODEL
 
     def gen_args(p):
-        p.add_argument("--retriever", default="bm25", choices=available())
+        p.add_argument("--retriever", default="bm25", type=retriever_name, help="bm25, dense, dense:bge-small, hybrid, hybrid:bge-small")
         p.add_argument("-k", type=int, default=8, help="passages per search (default: 8)")
         p.add_argument("--generator", default="claude", choices=available_generators())
         p.add_argument("--model", default=DEFAULT_MODEL, help=f"generator model (default: {DEFAULT_MODEL})")
@@ -271,6 +319,11 @@ def main(argv: list[str] | None = None) -> int:
     an.add_argument("--out", type=Path, default=paths.RUNS)
     an.add_argument("--name", default=None)
 
+    ix = sub.add_parser("index", help="build the embedding cache for dense / hybrid retrieval")
+    common(ix, questions=False)
+    ix.add_argument("--retriever", default="dense", type=retriever_name)
+    ix.add_argument("--query", help="also run this query and print the top 5, as a quick check")
+
     cp = sub.add_parser("compare", help="compare runs")
     cp.add_argument("runs", nargs="+", type=Path)
 
@@ -278,7 +331,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "compare":
         print(compare_runs(args.runs))
         return 0
-    return {"check": cmd_check, "search": cmd_search, "run": cmd_run, "ask": cmd_ask, "answer": cmd_answer}[args.cmd](args)
+    return {"check": cmd_check, "search": cmd_search, "run": cmd_run, "ask": cmd_ask, "answer": cmd_answer,
+            "index": cmd_index}[args.cmd](args)
 
 
 if __name__ == "__main__":

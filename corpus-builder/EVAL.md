@@ -125,6 +125,10 @@ class MyGenerator(Generator):
 
 `finish_answer` checks the citations against everything the trace saw and adds up tokens and cost over all LLM calls. A generator that searches once and answers can subclass `SingleShotGenerator` and only implement `generate(question, passages)`. Add it to `GENERATORS` and `get_generator` in `generation/answer.py`, and it can be used from `evaluate.py --generator`, the Ask page and the answer eval. For tool use, `llm.chat(system, messages, tools)` returns the text, the tool calls and the assistant message to append; it's cached like `complete`.
 
+## Retrievers
+
+`--retriever` takes `bm25` (default), `dense`, `dense:bge-small`, `hybrid` or `hybrid:bge-small` (or `dense:<huggingface id>`); see the top-level README for what each does. Dense ones need `requirements-dense.txt`. `python evaluate.py index --retriever dense` embeds the corpus ahead of time and says how many chunks are longer than the model reads; `--query "..."` adds a quick check of the top 5.
+
 ## Adding a retriever
 
-Same pattern as parsers. Create `retrieval/<name>.py` with a subclass of `retrieval.base.Retriever` (`index(chunks)`, `search(query, k)`, and `config()` returning every setting that affects results), add one line to `RETRIEVERS` in `retrieval/__init__.py`, then `python evaluate.py run --retriever <name>`.
+Same pattern as parsers. Create `retrieval/<name>.py` with a subclass of `retrieval.base.Retriever` (`index(chunks)`, `search(query, k)`, and `config()` returning every setting that affects results), add one line to `RETRIEVERS` in `retrieval/__init__.py` (and to `CHOICES` to show it in the app's menus), then `python evaluate.py run --retriever <name>`. A retriever that caches something per chunk run sets `uses_cache = True` and gets a folder through `set_cache_dir`. A reranker would be a retriever that wraps another one and reorders its top candidates.

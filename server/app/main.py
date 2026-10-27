@@ -9,12 +9,13 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import Settings
+from .core import RetrieverUnavailable
 from .deps import Services
-from .routers import ask, evals, meta, papers, questions, search
+from .routers import ask, evals, indexes, meta, papers, questions, search
 
 API_PREFIX = "/api"
 
@@ -26,8 +27,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # the Vite dev server runs on another port during development
     app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
                        allow_methods=["*"], allow_headers=["*"])
-    for r in (meta.router, papers.router, questions.router, search.router, evals.router, ask.router):
+    for r in (meta.router, papers.router, questions.router, search.router, evals.router, ask.router, indexes.router):
         app.include_router(r, prefix=API_PREFIX)
+    @app.exception_handler(RetrieverUnavailable)
+    def retriever_unavailable(request, exc: RetrieverUnavailable):
+        # e.g. dense retrieval without sentence-transformers installed: say how to fix it
+        return JSONResponse(status_code=503, content={"detail": {"message": str(exc), "errors": [],
+                                                                 "code": "retriever_unavailable"}})
+
     _mount_ui(app, settings.web_dist)
     return app
 

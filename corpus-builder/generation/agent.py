@@ -15,9 +15,11 @@
 Each turn sends the whole conversation, so it grows; prompt caching makes the repeated part
 cheap. The loop ends when Claude replies without calling a tool (that reply is the answer) or
 calls `give_up`. Two budgets keep it bounded: `max_turns` (model calls) and `token_budget`
-(input + output tokens over all turns). On the last allowed turn only `give_up` is offered,
-with a note to answer now, so it always ends. Citations are checked against everything it
-read, exactly as for single-shot answers.
+(input + output tokens over all turns). When one runs out, the next turn carries a note to
+answer now; tool calls made after that are not run (it is told so, once), so it always ends.
+The tools list itself never changes during a conversation: models that think return signed
+thinking blocks tied to it. Citations are checked against everything it read, exactly as for
+single-shot answers.
 """
 from __future__ import annotations
 
@@ -27,7 +29,7 @@ from typing import TYPE_CHECKING
 
 from .answer import Generator, Trace, finish_answer
 from .llm import LLM, LLMResponse
-from .prompts import AGENT_FINAL_TURN, AGENT_SYSTEM, AGENT_VERSION
+from .prompts import AGENT_FINAL_TURN, AGENT_VERSION, agent_system
 from .tools import GIVE_UP_TOOL, TOOLS, ToolContext, ToolResult
 
 if TYPE_CHECKING:
@@ -72,18 +74,23 @@ class AgentGenerator(Generator):
         trace = Trace(on_step)
         ctx = ToolContext(library, retriever=retriever, k=k)
         all_tools = [TOOLS[n].spec(ctx) for n in self.tools] + [GIVE_UP_TOOL]
+        system = agent_system(retriever)
         messages: list[dict] = [{"role": "user", "content": f"Question: {question}"}]
         used, warnings = 0, []
         text, answerable = "", False
 
-        for turn in range(1, self.max_turns + 1):
-            last = turn == self.max_turns or used >= self.token_budget
-            if last and turn > 1:
+        # The tools list stays the same on every turn. Thinking blocks the model returns are signed
+        # against it, and a different list (or a different order) makes the API reject them.
+        turn, noted, refused = 0, False, False
+        while True:
+            turn += 1
+            last = turn >= self.max_turns or used >= self.token_budget
+            if last and turn > 1 and not noted:
                 _append_text(messages[-1], AGENT_FINAL_TURN)
+                noted = True
                 if used >= self.token_budget:
                     warnings.append(f"token budget ({self.token_budget:,}) reached after {turn - 1} turns")
-            r = self.llm.chat(AGENT_SYSTEM, messages, [GIVE_UP_TOOL] if last else all_tools,
-                              self.max_tokens, cache=self.cache)
+            r = self.llm.chat(system, messages, all_tools, self.max_tokens, cache=self.cache)
             used += r.input_tokens + r.output_tokens
             messages.append(r.message())
             thought = r.text.strip()
@@ -108,6 +115,19 @@ class AgentGenerator(Generator):
                 trace.add("give_up", give_up.input, response=r, thought=thought)
                 break
 
+            if last:  # over budget but still calling tools: don't run them, ask for the answer once more
+                trace.add("refused", {"tools": [c.name for c in r.tool_calls]}, response=r, thought=thought,
+                          note="budget used up: tool calls not run", error=True)
+                if refused:
+                    text, answerable = "", False
+                    warnings.append("stopped without an answer: it kept calling tools after the budget ran out")
+                    break
+                refused = True
+                messages.append({"role": "user", "content": [
+                    {"type": "tool_result", "tool_use_id": c.id, "is_error": True,
+                     "content": "Not run: the search budget is used up. " + AGENT_FINAL_TURN} for c in r.tool_calls]})
+                continue
+
             results = []
             for i, call in enumerate(r.tool_calls):
                 t0 = time.perf_counter()
@@ -123,9 +143,6 @@ class AgentGenerator(Generator):
                     block["is_error"] = True
                 results.append(block)
             messages.append({"role": "user", "content": results})
-        else:  # the last turn offered only give_up, yet it called another tool
-            text, answerable = "", False
-            warnings.append("stopped without an answer: the budget ran out")
 
         return finish_answer(question, text, answerable, trace, self, warnings)
 

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDeleteEval, useEvals, useJob, useLlm, useMeta, useQuestions, useStartEval } from "../api/hooks";
 import type { EvalBrief } from "../api/types";
+import { DenseNote, RetrieverSelect, retrieverLabel } from "../components/RetrieverSelect";
 import { Empty, ErrorBanner, Seg } from "../components/ui";
 import { useRun } from "../run";
 
@@ -122,12 +123,8 @@ function RunEvalPanel() {
           </select>
         </label>
         <label className="inline-field">
-          <span>Retriever</span>
-          <select className="select" value={retriever} onChange={(e) => setRetriever(e.target.value)}>
-            {(meta.data?.retrievers ?? ["bm25"]).map((r) => (
-              <option key={r}>{r}</option>
-            ))}
-          </select>
+          <span>{kind === "answer" && generator === "agent" ? "Agent's search" : "Retriever"}</span>
+          <RetrieverSelect value={retriever} onChange={setRetriever} />
         </label>
         <div className="inline-field">
           <span>Questions</span>
@@ -143,6 +140,7 @@ function RunEvalPanel() {
           />
         </div>
       </div>
+      <DenseNote retriever={retriever} />
       {kind === "answer" && (
         <div className="row" style={{ marginTop: 10, gap: 14 }}>
           <div className="inline-field">
@@ -287,7 +285,7 @@ export function ResultsPage() {
                     <td className="small">
                       <span className={`pill ${r.kind === "answer" ? "accent" : ""}`}>{r.kind === "answer" ? "Answers" : "Retrieval"}</span>{" "}
                       {r.kind === "answer" && <>{r.generator?.name === "agent" ? `agent (${r.generator.model})` : r.generator?.model ?? "extractive"}, </>}
-                      {r.retriever?.name} on {r.chunks}
+                      {retrieverLabel(r.retriever)} on {r.chunks}
                       {r.git_commit && <div className="xs muted">commit {r.git_commit}</div>}
                     </td>
                     <td className="num">{r.n_scored}</td>

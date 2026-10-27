@@ -24,6 +24,10 @@ def load_chunks(path: Path) -> list[dict]:
         return [json.loads(line) for line in fh if line.strip()]
 
 
+class RetrieverUnavailable(RuntimeError):
+    """The retriever can't run here: a missing package, or a model that can't be downloaded."""
+
+
 class Retriever(ABC):
     """Indexes chunks once, then answers queries with ranked chunk ids.
 

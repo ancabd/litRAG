@@ -78,6 +78,7 @@ class Search(Tool):
     description = ("Keyword search (BM25) over all passages of all papers. Returns the best-matching passages "
                    "with their ids. Use the words a paper would use. Optionally restrict to one paper or to "
                    "papers from a year onwards.")
+    KIND = {"dense": "Semantic search", "hybrid": "Keyword and semantic search"}
     input_schema = {
         "type": "object",
         "properties": {
@@ -91,7 +92,11 @@ class Search(Tool):
 
     def spec(self, ctx=None):
         spec = super().spec()
-        if ctx is not None:  # say what the default actually is in this run
+        if ctx is not None:  # say what the default actually is in this run, and what kind of search it is
+            kind = self.KIND.get(ctx.retriever.split(":")[0])
+            if kind:
+                spec["description"] = spec["description"].replace("Keyword search (BM25)", kind).replace(
+                    " Use the words a paper would use.", "")
             schema = json.loads(json.dumps(spec["input_schema"]))
             schema["properties"]["k"]["description"] = f"Number of passages (default {min(ctx.k, MAX_K)})."
             spec["input_schema"] = schema

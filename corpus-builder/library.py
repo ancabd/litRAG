@@ -10,7 +10,8 @@ through this one object, so they search and read the corpus the same way.
     lib.paper("W4225405705")                                           # title, year, sections
     lib.section_chunks("W4225405705", "2 Methods > 2.1 Equivariant features")
 
-Retriever indexes are built on first use and cached per retriever (and its options).
+Retriever indexes are built on first use and cached per retriever (and its options). Dense
+retrievers also keep their embeddings on disk in the chunk run's embeddings/ folder.
 """
 from __future__ import annotations
 
@@ -18,7 +19,7 @@ import json
 import threading
 from pathlib import Path
 
-from retrieval import Hit, Retriever, get_retriever, load_chunks
+from retrieval import Hit, Retriever, build_retriever, load_chunks
 
 PAPER_FIELDS = ("title", "year", "authors", "venue", "doi")
 
@@ -35,6 +36,7 @@ class Library:
         for cs in self.by_paper.values():
             cs.sort(key=lambda c: c.get("index", 0))
         self._retrievers: dict[str, Retriever] = {}
+        self._building: dict[str, threading.Lock] = {}
         self._gold = None
         self._lock = threading.RLock()
 
@@ -53,14 +55,29 @@ class Library:
 
     # ------------------------------------------------------------------ search
 
-    def retriever(self, name: str = "bm25", **options) -> Retriever:
+    @property
+    def embeddings_dir(self) -> Path | None:
+        """Where dense retrievers cache their embeddings for this chunk run."""
+        return self.path / "embeddings" if self.path else None
+
+    def retriever(self, name: str = "bm25", progress=None, **options) -> Retriever:
+        """Built (and indexed) once per name and options. A slow build (embedding the corpus) holds
+        only its own lock, so BM25 searches keep working while a dense index is being built.
+        `progress(done, total)` reports embedding progress (it is not part of the cache key)."""
         key = name + (json.dumps(options, sort_keys=True) if options else "")
         with self._lock:
-            if key not in self._retrievers:
-                r = get_retriever(name, **options)
-                r.index(self.chunks)
+            r = self._retrievers.get(key)
+            if r is not None:
+                return r
+            build_lock = self._building.setdefault(key, threading.Lock())
+        with build_lock:
+            with self._lock:
+                if key in self._retrievers:
+                    return self._retrievers[key]
+            r = build_retriever(name, self.chunks, self.embeddings_dir, progress=progress, **options)
+            with self._lock:
                 self._retrievers[key] = r
-            return self._retrievers[key]
+            return r
 
     def search(self, query: str, k: int = 10, retriever: str = "bm25", paper: str | None = None,
                year_from: int | None = None, year_to: int | None = None, exclude: set[str] | None = None) -> list[Hit]:

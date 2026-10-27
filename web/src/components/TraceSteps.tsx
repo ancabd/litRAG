@@ -7,6 +7,7 @@ const VERB: Record<string, string> = {
   open_paper: "Opened paper",
   answer: "Answered",
   give_up: "Gave up",
+  refused: "Over budget",
 };
 
 function what(s: TraceStep): string {

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from ..core import LLMError, LLMNotConfigured, available_retrievers, keys
+from ..core import LLMError, LLMNotConfigured, is_retriever, keys
 from ..deps import Services, require_run, services
 
 router = APIRouter(tags=["ask"])
@@ -69,7 +69,7 @@ def remove_key(request: Request, svc: Services = Depends(services)) -> dict:
 
 @router.post("/ask")
 async def ask(body: AskIn, svc: Services = Depends(services)) -> dict:
-    if body.retriever not in available_retrievers():
+    if not is_retriever(body.retriever):
         raise HTTPException(400, f"Unknown retriever {body.retriever!r}")
     data = require_run(svc, body.run)
     try:

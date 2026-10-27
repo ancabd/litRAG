@@ -155,7 +155,8 @@ def test_anthropic_chat_converts_blocks(monkeypatch):
         def create(self, **kw):
             sent.update(kw)
             return SimpleNamespace(
-                content=[SimpleNamespace(type="text", text="Searching."),
+                content=[SimpleNamespace(type="thinking", thinking="Plan.", signature="sig-1"),
+                         SimpleNamespace(type="text", text="Searching."),
                          SimpleNamespace(type="tool_use", id="toolu_1", name="search", input={"query": "x"})],
                 usage=SimpleNamespace(input_tokens=120, output_tokens=30), stop_reason="tool_use")
 
@@ -165,7 +166,8 @@ def test_anthropic_chat_converts_blocks(monkeypatch):
     r = llm.chat("sys", [{"role": "user", "content": "q"}], TOOLS, max_tokens=500)
     assert sent["tools"] == TOOLS and sent["max_tokens"] == 500 and sent["system"] == "sys"
     assert r.text == "Searching." and r.tool_calls == [ToolCall("toolu_1", "search", {"query": "x"})]
-    assert r.content[1] == {"type": "tool_use", "id": "toolu_1", "name": "search", "input": {"query": "x"}}
+    assert r.content[0] == {"type": "thinking", "thinking": "Plan.", "signature": "sig-1"}
+    assert r.content[2] == {"type": "tool_use", "id": "toolu_1", "name": "search", "input": {"query": "x"}}
     assert r.stop_reason == "tool_use" and r.input_tokens == 120
     sent.clear()
     llm.chat("sys", [{"role": "user", "content": "q"}])

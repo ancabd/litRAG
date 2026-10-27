@@ -109,6 +109,10 @@ def _block(b) -> dict:
         return {"type": "text", "text": b.text}
     if b.type == "tool_use":
         return {"type": "tool_use", "id": b.id, "name": b.name, "input": dict(b.input or {})}
+    if b.type == "thinking":  # signed: must go back exactly as received, with the same tools list
+        return {"type": "thinking", "thinking": b.thinking, "signature": b.signature}
+    if b.type == "redacted_thinking":
+        return {"type": "redacted_thinking", "data": b.data}
     return b.model_dump(exclude_none=True) if hasattr(b, "model_dump") else {"type": b.type}
 
 

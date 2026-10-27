@@ -11,7 +11,7 @@ from evaluate import main as evaluate_main  # noqa: E402
 from evaluation.answer_runner import run_answer_eval  # noqa: E402
 from generation import answer as answer_module  # noqa: E402
 from generation.agent import AgentGenerator  # noqa: E402
-from generation.llm import CachedLLM, LLMResponse, ScriptedLLM  # noqa: E402
+from generation.llm import CachedLLM, LLMResponse, ScriptedLLM, ToolCall  # noqa: E402
 from generation.prompts import AGENT_FINAL_TURN, AGENT_VERSION  # noqa: E402
 from library import Library  # noqa: E402
 
@@ -117,32 +117,80 @@ def test_bad_tool_calls_are_errors_the_model_can_recover_from():
     assert not ans.answerable and ans.answer == "Nothing found." and [s["error"] for s in ans.trace[:4]] == [True] * 4
 
 
-def test_turn_budget_forces_an_answer():
+def told_to_answer(messages):
+    last = messages[-1]["content"]
+    return isinstance(last, list) and any(AGENT_FINAL_TURN in (b.get("text") or str(b.get("content") or "")) for b in last)
+
+
+def test_turn_budget_forces_an_answer_without_changing_the_tools():
     seen_tools = []
 
     def respond(system, messages, tools):
-        seen_tools.append([t["name"] for t in tools])
-        if len(tools) == 1:
+        seen_tools.append(json.dumps(tools))
+        if told_to_answer(messages):
             return "4 Angstrom [NQ#001]."
         return {"tool_calls": [{"name": "search", "input": {"query": "cutoff"}}]}
 
     llm = ScriptedLLM(chat_respond=respond)
     ans = AgentGenerator(llm, max_turns=3).answer("q", lib())
-    assert seen_tools[0] == ["search", "read_around", "open_paper", "give_up"]
-    assert seen_tools[-1] == ["give_up"] and len(seen_tools) == 3
+    names = [t["name"] for t in json.loads(seen_tools[0])]
+    assert names == ["search", "read_around", "open_paper", "give_up"]
+    assert len(seen_tools) == 3 and len(set(seen_tools)) == 1  # identical tools on every turn (thinking signatures)
     assert llm.chats[-1][-1]["content"][-1] == {"type": "text", "text": AGENT_FINAL_TURN}
     assert ans.answerable and ans.citations == ["NQ#001"]
 
 
+def test_tool_calls_after_the_budget_are_refused_once_then_it_stops():
+    def stubborn(system, messages, tools):
+        return {"tool_calls": [{"name": "search", "input": {"query": "cutoff"}}]}
+
+    llm = ScriptedLLM(chat_respond=stubborn)
+    ans = AgentGenerator(llm, max_turns=2).answer("q", lib())
+    assert [s["action"] for s in ans.trace] == ["search", "refused", "refused"]
+    refusal = [b for b in llm.chats[-1][-1]["content"] if b.get("type") == "tool_result"][0]
+    assert refusal["is_error"] and "budget is used up" in refusal["content"]
+    assert not ans.answerable and any("kept calling tools" in w for w in ans.warnings) and len(llm.chats) == 3
+
+    def obedient_after_refusal(system, messages, tools):
+        results = tool_results(messages)
+        if results and "budget is used up" in results[-1]["content"]:
+            return "4 Angstrom [NQ#001]."
+        return {"tool_calls": [{"name": "search", "input": {"query": "cutoff"}}]}
+
+    ans = AgentGenerator(ScriptedLLM(chat_respond=obedient_after_refusal), max_turns=2).answer("q", lib())
+    assert ans.answerable and ans.citations == ["NQ#001"] and [s["action"] for s in ans.trace][-1] == "answer"
+
+
 def test_token_budget_ends_early():
     def respond(system, messages, tools):
-        if len(tools) == 1:
+        if told_to_answer(messages):
             return {"tool_calls": [{"name": "give_up", "input": {"reason": "Out of budget."}}]}
         return {"tool_calls": [{"name": "search", "input": {"query": "cutoff"}}]}
 
     ans = AgentGenerator(ScriptedLLM(chat_respond=respond), max_turns=10, token_budget=1).answer("q", lib())
     assert [s["action"] for s in ans.trace] == ["search", "give_up"]
     assert any("token budget" in w for w in ans.warnings) and not ans.answerable
+
+
+def test_thinking_blocks_are_sent_back_unchanged():
+    """Models that think return signed thinking blocks; the next request must carry them as they were."""
+    calls = []
+
+    class ThinkingLLM(ScriptedLLM):
+        def chat(self, system, messages, tools=None, max_tokens=1024, cache=False):
+            calls.append((json.loads(json.dumps(messages)), json.dumps(tools)))
+            if len(calls) == 1:
+                content = [{"type": "thinking", "thinking": "Search first.", "signature": "sig-abc"},
+                           {"type": "tool_use", "id": "toolu_1", "name": "search", "input": {"query": "cutoff"}}]
+                return LLMResponse("", self.model, 100, 20, content=content,
+                                   tool_calls=[ToolCall("toolu_1", "search", {"query": "cutoff"})], stop_reason="tool_use")
+            return LLMResponse("4 Angstrom [NQ#001].", self.model, 200, 20,
+                               content=[{"type": "text", "text": "4 Angstrom [NQ#001]."}], stop_reason="end_turn")
+
+    ans = AgentGenerator(ThinkingLLM(), max_turns=4).answer("q", lib())
+    second_messages, second_tools = calls[1]
+    assert second_messages[1]["content"][0] == {"type": "thinking", "thinking": "Search first.", "signature": "sig-abc"}
+    assert second_tools == calls[0][1] and ans.citations == ["NQ#001"]
 
 
 def test_plain_text_ending_and_made_up_citation():

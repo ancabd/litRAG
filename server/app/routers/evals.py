@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from ..core import LLMNotConfigured, QuestionFileError, available_retrievers
+from ..core import LLMNotConfigured, QuestionFileError, is_retriever
 from ..deps import Services, services
 
 router = APIRouter(tags=["evals"])
@@ -57,7 +57,7 @@ def get_eval(name: str, svc: Services = Depends(services)) -> dict:
 
 @router.post("/evals", status_code=201)
 async def start_eval(body: StartEval, svc: Services = Depends(services)) -> dict:
-    if body.retriever not in available_retrievers():
+    if not is_retriever(body.retriever):
         raise HTTPException(400, f"Unknown retriever {body.retriever!r}")
     if body.split not in ("dev", "test", "all"):
         raise HTTPException(400, "split must be dev, test or all")

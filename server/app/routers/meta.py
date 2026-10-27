@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from ..core import SPLITS, TYPES, available_retrievers
+from ..core import SPLITS, TYPES, retriever_choices
 from ..deps import Services, services
 
 router = APIRouter(tags=["meta"])
@@ -21,7 +21,8 @@ def meta(svc: Services = Depends(services)) -> dict:
                    "seeds": svc.corpus.seeds()},
         "runs": svc.chunks.list_runs(),
         "default_run": svc.chunks.default_run(),
-        "retrievers": available_retrievers(),
+        "retrievers": [c["name"] for c in retriever_choices()],
+        "retriever_choices": retriever_choices(),
         "questions": {"types": list(TYPES), "splits": list(SPLITS), "tags": tags, "count": len(questions)},
         "paths": {k: str(v) for k, v in vars(svc.settings).items()},
     }

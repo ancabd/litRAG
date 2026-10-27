@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { retrieverLabel } from "../components/RetrieverSelect";
 import { Link, useParams } from "react-router-dom";
 import { useEval } from "../api/hooks";
 import type { EvalHit, EvalQuestion, Interval } from "../api/types";
@@ -133,7 +134,7 @@ export function ResultPage() {
         <div>
           <h1>Eval run, {when(r.created)}</h1>
           <p className="sub">
-            {r.retriever?.name} on {r.chunks} ({r.parser}), {r.split} split, {r.n_scored} of {r.n_questions} questions scored
+            {retrieverLabel(r.retriever)} on {r.chunks} ({r.parser}), {r.split} split, {r.n_scored} of {r.n_questions} questions scored
             {r.git_commit && `, commit ${r.git_commit}`}
           </p>
         </div>

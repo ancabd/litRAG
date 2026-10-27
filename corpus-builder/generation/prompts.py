@@ -39,7 +39,7 @@ AGENT_VERSION = "agent-v2"
 AGENT_SYSTEM = """You answer questions about a collection of scientific papers. You cannot see the papers directly: you find and read passages with your tools, then answer from what you read.
 
 Tools:
-- search: keyword search (BM25) over all passages. It matches words, not meaning, so use the words a paper would use: technical terms, method and model names, symbols spelled out. If a search finds nothing useful, rephrase it rather than repeating it. You can restrict a search to one paper.
+- search: {search_hint} If a search finds nothing useful, rephrase it rather than repeating it. You can restrict a search to one paper.
 - read_around: the passages just before and after a passage, when it is cut off mid-argument or you need its context (for example the definitions around an equation).
 - open_paper: a paper's title, year, abstract and list of sections, to find where in a paper to look.
 - give_up: say that the papers don't answer the question.
@@ -54,6 +54,23 @@ Rules for the answer:
 - Use only information stated in the passages you read. Do not add facts from your own knowledge, even if you are sure of them.
 - Cite every claim with the id of the passage that supports it, in square brackets, e.g. [W2025444507#003]. Use only ids shown in your tool results. A sentence may cite several passages: [W1#002][W2#010].
 - Be concise: usually 1 to 4 sentences, at most one short paragraph per part of a comparison. Plain prose only: no headings, bold, bullet lists or other markdown, and no preamble such as "Based on the passages". Keep the papers' technical terms; write formulas in plain text."""
+
+# How the search tool works depends on the retriever; the agent prompt says which, in one sentence.
+# For bm25 the prompt is exactly the agent-v2 text; the retriever is stored with every run.
+SEARCH_HINTS = {
+    "bm25": "keyword search (BM25) over all passages. It matches words, not meaning, so use the words a paper would "
+            "use: technical terms, method and model names, symbols spelled out.",
+    "dense": "semantic search over all passages. It matches meaning, so describe what you are looking for in plain "
+             "words; exact symbols and spellings matter less.",
+    "hybrid": "keyword and semantic search combined, over all passages. Use the papers' technical terms and names "
+              "where you know them; describing the idea in plain words also works.",
+}
+
+
+def agent_system(retriever: str = "bm25") -> str:
+    kind = retriever.split(":")[0]
+    return AGENT_SYSTEM.format(search_hint=SEARCH_HINTS.get(kind, SEARCH_HINTS["bm25"]))
+
 
 AGENT_FINAL_TURN = ("You have used your search budget. Write your final answer now as plain text, citing only passages "
                     "you have read, or call give_up if they don't answer the question.")

@@ -5,6 +5,7 @@ import type { AskResult } from "../api/types";
 import { AnswerText } from "../components/AnswerText";
 import { ChunkCard } from "../components/ChunkCard";
 import { KeyForm } from "../components/KeyForm";
+import { DenseNote, RetrieverSelect } from "../components/RetrieverSelect";
 import { TraceSteps } from "../components/TraceSteps";
 import { ErrorBanner, Seg } from "../components/ui";
 import { useRun } from "../run";
@@ -29,6 +30,7 @@ export function AskPage() {
   const [generator, setGenerator] = useState<"claude" | "agent" | "extractive">("claude");
   const [model, setModel] = useState("");
   const [k, setK] = useState(8);
+  const [retriever, setRetriever] = useState("bm25");
   const [history, setHistory] = useState<AskResult[]>([]);
   const [shown, setShown] = useState<AskResult | null>(null);
 
@@ -37,7 +39,7 @@ export function AskPage() {
   const submit = () => {
     if (question.trim().length < 3 || ask.isPending || needsKey) return;
     ask.mutate(
-      { question: question.trim(), generator, model: usesModel ? model || undefined : undefined, k },
+      { question: question.trim(), generator, model: usesModel ? model || undefined : undefined, k, retriever },
       {
         onSuccess: (r) => {
           setShown(r);
@@ -102,6 +104,7 @@ export function AskPage() {
               </option>
             ))}
           </select>
+          <RetrieverSelect value={retriever} onChange={setRetriever} />
           <span className="spacer" />
           <button type="button" className="btn primary" onClick={submit} disabled={ask.isPending || question.trim().length < 3 || !!needsKey || !run}>
             {ask.isPending ? (generator === "agent" ? "Searching and reading…" : "Answering…") : "Ask"}
@@ -112,6 +115,7 @@ export function AskPage() {
           {generator === "claude" && "One search with your question; Claude answers from the top passages."}
           {generator === "agent" && "Claude searches and reads with tools, as many times as it needs (up to 8 model calls), then answers. Slower, and its steps are shown below the answer."}
         </p>
+        <DenseNote retriever={retriever} />
       </div>
 
       {needsKey && (

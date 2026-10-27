@@ -1,0 +1,5 @@
+# Optional: dense and hybrid retrieval with local embedding models (CPU is fine for this corpus).
+# On Linux without a GPU, install the much smaller CPU build of PyTorch first:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+sentence-transformers>=3.0
+einops>=0.7        # nomic-embed-text runs custom model code that needs it

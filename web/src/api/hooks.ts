@@ -11,6 +11,7 @@ import type {
   EvalCompare,
   EvalDetail,
   EvidenceCheckResult,
+  IndexStatus,
   ManualResult,
   Meta,
   PaperDetail,
@@ -62,11 +63,12 @@ export function usePaperChunks(id: string | undefined, enabled = true) {
   });
 }
 
-export function useSearch(q: string, opts: { k?: number; paper?: string } = {}) {
+export function useSearch(q: string, opts: { k?: number; paper?: string; retriever?: string } = {}) {
   const { run } = useRun();
   return useQuery({
     queryKey: ["search", q, run, opts],
-    queryFn: () => api.get<SearchResult>("/search", { q, run, k: opts.k ?? 10, paper: opts.paper }),
+    queryFn: () =>
+      api.get<SearchResult>("/search", { q, run, k: opts.k ?? 10, paper: opts.paper, retriever: opts.retriever ?? "bm25" }),
     enabled: q.trim().length > 0,
     placeholderData: keepPreviousData,
   });
@@ -284,5 +286,26 @@ export function useDeleteEval() {
   return useMutation({
     mutationFn: (name: string) => api.del<{ deleted: string }>(`/evals/${encodeURIComponent(name)}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["evals"] }),
+  });
+}
+
+// ------------------------------------------------------------------ embedding indexes
+
+export function useIndexes() {
+  const { run } = useRun();
+  return useQuery({
+    queryKey: ["indexes", run],
+    queryFn: () => api.get<IndexStatus>("/indexes", { run }),
+    enabled: !!run,
+    refetchInterval: (q) => (q.state.data?.models.some((m) => m.job) ? 1000 : false), // while building
+  });
+}
+
+export function useBuildIndex() {
+  const qc = useQueryClient();
+  const { run } = useRun();
+  return useMutation({
+    mutationFn: (model: string) => api.post<{ job: Job }>("/indexes", { model, run }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["indexes"] }),
   });
 }

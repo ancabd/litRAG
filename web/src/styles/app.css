@@ -1587,3 +1587,33 @@ a.cite:hover {
 .trace-error strong {
   color: var(--warn);
 }
+.dense-note {
+  margin-top: 8px;
+}
+.index-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.index-progress .job-bar {
+  width: 160px;
+  margin: 0;
+}
+.index-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.index-row {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rule);
+}
+@media (max-width: 640px) {
+  .index-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
