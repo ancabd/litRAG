@@ -2,23 +2,6 @@
 
 Agentic RAG over the literature on machine-learned interatomic potentials and biomolecular simulation, with an evaluation harness and a web app.
 
-```
-litrag/
-  corpus-builder/   core library + command-line tools
-                    corpus_builder.py   seeds -> papers, PDFs, abstracts   (README.md)
-                    parse_corpus.py     PDFs + abstracts -> chunks          (INGEST.md)
-                    evaluate.py         ask, retrieval eval, answer eval    (EVAL.md)
-  data/             everything the tools read and write (code never lives here)
-                    corpus/      papers, PDFs, abstracts, manifest
-                    chunks/      one folder per parser + chunk config
-                    questions/   questions.yaml, your eval set
-                    runs/        one folder per eval run
-                    cache/       cached LLM responses (rerunning an eval is free)
-  server/           FastAPI app: the core as an HTTP API, and serves the UI
-  web/              React + TypeScript UI (Vite); web/dist is the built version
-```
-
-The command-line tools and the app work on the same files. Questions you write in the app go to `data/questions/questions.yaml`, which is exactly what `evaluate.py` reads.
 
 ## Setup
 
@@ -60,6 +43,25 @@ python -m app            # http://127.0.0.1:8000   (API docs: /api/docs)
 The chunk run (e.g. `pymupdf_w400_o60`) is picked in the sidebar; evidence checks, search and chunk counts all use it.
 
 **Saving is safe to mix with a text editor.** Every save is validated with the same rules as `evaluate.py check`, written atomically, and refused if `questions.yaml` changed since the app loaded it. You then get a "Reload file" button, and your unsaved form edits are kept. The comment block at the top of the file is preserved; comments *inside* questions are not, so use the `notes` field.
+
+## Structure
+```
+litrag/
+  corpus-builder/   core library + command-line tools
+                    corpus_builder.py   seeds -> papers, PDFs, abstracts   (README.md)
+                    parse_corpus.py     PDFs + abstracts -> chunks          (INGEST.md)
+                    evaluate.py         ask, retrieval eval, answer eval    (EVAL.md)
+  data/             everything the tools read and write (code never lives here)
+                    corpus/      papers, PDFs, abstracts, manifest
+                    chunks/      one folder per parser + chunk config
+                    questions/   questions.yaml, your eval set
+                    runs/        one folder per eval run
+                    cache/       cached LLM responses (rerunning an eval is free)
+  server/           FastAPI app: the core as an HTTP API, and serves the UI
+  web/              React + TypeScript UI (Vite); web/dist is the built version
+```
+
+The command-line tools and the app work on the same files. Questions you write in the app go to `data/questions/questions.yaml`, which is exactly what `evaluate.py` reads.
 
 ## How answering works: single shot and the agent
 
@@ -143,20 +145,7 @@ Answer runs save the trace of every question in `per_question.jsonl`.
 - "Evidence retrieved" means the evidence was among *any* passage the agent read, not just the first search.
 - Each question also records its effort: model calls, tool calls, searches, passages read, tokens, cost, time, and whether it gave up or ran out of budget. The run page and the report show the averages.
 
-### Comparing the agent with single shot
 
-Run both on the same questions, select the two runs on the Results tab and press Compare (or `python evaluate.py compare ../data/runs/<single> ../data/runs/<agent>`). Besides each run's means, Compare shows:
-
-- **A paired comparison**, question by question. For every metric:
-  - the mean difference with a paired bootstrap 95% interval
-  - how many questions got better, worse or stayed the same
-  - an exact sign test on better vs worse
-  - which questions moved, linked to the questions
-- **Effort per question** side by side: what the extra correctness cost in calls, tokens, dollars and seconds.
-
-Why paired: with 20–60 questions, two runs' separate intervals overlap for almost any difference. But both runs answered the same questions, and most of the variation is shared (some questions are just hard), so differences per question are far less noisy. If the agent fixes 6 questions and breaks none, that is clear (p = 0.03) even when the two means' intervals overlap.
-
-Where to look first: the `type:multihop` and `type:comparison` groups, and the `retrieval:missed` group of the single-shot run, which are the questions one search couldn't serve.
 
 **Running it.**
 
@@ -171,46 +160,6 @@ python evaluate.py answer --generator agent --judge claude-sonnet-5-5  # the ans
 **Extending it.** A new tool is a `Tool` subclass in `generation/tools.py` (name, description, JSON schema, and a `run` that uses the `Library`) plus one line in `TOOLS`; turn it on with `--tools`. Planned next:
 - `find_papers`, a search over titles and abstracts that returns papers rather than passages
 - `citations`, which follows references and citing papers within the corpus, once the corpus builder saves the citation graph
-
-## Design choices
-
-The decisions that shape the project, and why. Each one is something you could reasonably do differently.
-
-**Corpus and data**
-- *A citation-graph corpus, not a keyword crawl.* Seeds plus one backward and one forward citation hop (`corpus_builder.py`) give a field-shaped corpus: the papers the seeds build on and the work that builds on them. It's small enough to read the eval results by hand and real enough that retrieval is not trivial.
-- *Free full texts only, abstracts otherwise, and manual additions on top.* Nothing goes through paywalls. Papers you add by hand are recorded in `manual.jsonl` and re-applied on every rebuild, so they survive regenerating the corpus.
-- *Code and data are separate* (`corpus-builder/` vs `data/`). Paths come from one place (`paths.py`, `server/app/config.py`), and every part can be moved with an environment variable.
-
-**Parsing and chunking**
-- *Parsers are pluggable, and outputs never overwrite each other.* Each parser + chunk setting writes its own folder (`data/chunks/pymupdf_w400_o60/`), so two parsers or two chunk sizes can be run through the same eval and compared.
-- *PyMuPDF first, with heuristics for scientific PDFs* (running headers, section numbering, references dropped). Equations are the known weak spot. The `equation` tag in the questions exists to measure how much that costs before paying for a heavier parser.
-
-**Retrieval evaluation**
-- *Evidence is a quote, not a chunk id.* Questions point to a paper and a sentence; the eval finds the chunk that contains it (word-trigram overlap). Gold labels therefore survive re-chunking and parser changes, which chunk ids would not.
-- *Strict and lenient scores.* Another paper often says the same thing as your evidence. Rather than counting that as a miss or silently accepting it, you mark such passages as alternatives, and both scores are reported. "Judged@10" says how much of each top 10 you have reviewed, i.e. how far the lenient score can be trusted.
-- *Every number has a 95% bootstrap interval*, because with tens of questions the uncertainty is the main fact about a result.
-
-**Answers and their evaluation**
-- *The same rules for every generator*: answer only from passages read, cite each claim as `[chunk_id]`, decline rather than guess, 1–4 sentences of plain prose. Comparisons then measure retrieval and reasoning, not prompt style.
-- *Citations are checked mechanically* against the passages the generator actually saw; a made-up id is counted, not trusted.
-- *Separate metrics instead of one score*: correct (against your reference), supported (by what it cites), cites your evidence, evidence retrieved, invalid citations, and declining when it should and shouldn't. Each failure mode then shows up on its own line. The `retrieval:found` / `retrieval:missed` split separates retrieval failures from generation failures.
-- *An LLM judge, validated against you.* Correctness and support need judgment, so an LLM grades them. Its verdicts are only worth reporting next to how often it agrees with yours: grade answers on a run page, and the app shows agreement and Cohen's κ.
-- *A no-LLM baseline.* The extractive generator is the floor every model has to beat, and lets everything be run and tested without a key.
-- *Paired comparisons between runs*: the sign test and paired bootstrap described above, because with a small question set they are what can show a real difference.
-- *Effort is measured with correctness.* Calls, tokens, cost and time are recorded per question, so "better" always comes with "at what price".
-
-**The agent**
-- *A hand-written loop, not a framework.* About 100 lines (`generation/agent.py`) on the Messages API's tool use. Every step is visible, the loop is tested offline with a scripted model (`tests/test_agent.py`), and the output is the same `Answer` as single shot, so the evals don't care which generator produced it. A LangGraph version would make a good comparison later.
-- *Tools are thin wrappers over `Library`*, the single object that the CLI, server, evals and generators all use to read the corpus. A tool can't see the corpus differently from the eval that scores it.
-- *A plain reply is the answer; `give_up` is a tool.* The first version had an `answer` tool too, but in the first real run Haiku wrote its answer as text instead of calling it. Ending on a reply without tool calls is how Claude naturally finishes, so the agent now accepts that as the answer. Declining stays an explicit tool call, so the eval can score it. A text reply that refuses without citations still counts as declining.
-- *Same passages per search as single shot.* A search returns `k` passages by default, the same `k` single shot gets, and the tool description states that default. In the first real run Haiku asked for 5 because an earlier description said "default 5". The model may still ask for fewer or more (up to 10), and the trace records what it chose.
-- *Bounded by budgets, not trust.* Turns and tokens are capped. On the last turn only `give_up` is offered, so every question ends in an answer or an explicit give-up.
-- *Built to be cheap to run.* Passages are shown in full only once. Prompt caching bills the repeated conversation at 5–10% of the input price. Every request is cached on disk, so rerunning an eval is free and gives the same answers.
-- *Prompts are versioned* (`agent-v2`, `answer-v1`, `judge-v1`) and stored with every run, so results from different prompts are never mixed up silently.
-
-**Software**
-- *The core is a library with a CLI; the server is a thin layer over it.* The app and `evaluate.py` run the same functions and write the same folders, so terminal runs and app runs are interchangeable.
-- *Everything model-related is cached and testable offline.* A scripted model stands in for Claude in the tests, including tool calls.
 
 ## Working on the UI
 
