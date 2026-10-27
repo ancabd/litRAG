@@ -46,10 +46,30 @@ def test_parse_json_tolerates_fences_and_prose():
     assert parse_json("no json here") is None
 
 
-def test_missing_key_is_reported(monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+def test_missing_key_is_reported():
     with pytest.raises(LLMNotConfigured, match="ANTHROPIC_API_KEY"):
         make_llm("claude-sonnet-5-5")
+
+
+def test_key_sources_and_saved_file(isolated_keys, monkeypatch):
+    keys = isolated_keys
+    assert keys.current_key() == (None, None) and not keys.status()["configured"]
+    keys.set_key("  sk-ant-saved-1234  ", remember=True)
+    path = keys.key_file()
+    assert path.exists() and (path.stat().st_mode & 0o777) == 0o600
+    assert keys.current_key() == ("sk-ant-saved-1234", "session")
+    monkeypatch.setattr(keys, "_session_key", None)          # a restart: the saved key is used
+    assert keys.current_key() == ("sk-ant-saved-1234", "saved")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-env-5678")
+    assert keys.current_key() == ("sk-ant-env-5678", "environment")
+    keys.set_key("sk-ant-session-9999", remember=False)       # set in the app: wins until restart
+    st = keys.status()
+    assert st["source"] == "session" and st["hint"] == "…9999" and "sk-ant" not in json.dumps({k: v for k, v in st.items() if k != "key_file"})
+    assert keys.saved_key() == "sk-ant-saved-1234"            # remember=False left the saved key alone
+    keys.clear_key()
+    assert not path.exists() and keys.current_key() == ("sk-ant-env-5678", "environment")
+    llm = make_llm("claude-haiku-5-5")                         # the client picks the key up from the store
+    assert llm.client.api_key == "sk-ant-env-5678"
 
 
 # ------------------------------------------------------------------ generators

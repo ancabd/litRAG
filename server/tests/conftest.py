@@ -51,6 +51,16 @@ QUESTIONS = """# Header comment that must survive edits.
 """
 
 
+@pytest.fixture(autouse=True)
+def isolated_keys(tmp_path, monkeypatch):
+    """Keep tests away from your real API key: no environment key, no saved key, no session key."""
+    from generation import keys
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("LITRAG_KEY_FILE", str(tmp_path / "litrag-credentials.json"))
+    monkeypatch.setattr(keys, "_session_key", None)
+    yield keys
+
+
 @pytest.fixture
 def data_dir(tmp_path):
     core = tmp_path / "core"

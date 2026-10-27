@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useAsk, useLlm } from "../api/hooks";
 import type { AskResult } from "../api/types";
 import { AnswerText } from "../components/AnswerText";
 import { ChunkCard } from "../components/ChunkCard";
+import { KeyForm } from "../components/KeyForm";
 import { TraceSteps } from "../components/TraceSteps";
 import { ErrorBanner, Seg } from "../components/ui";
 import { useRun } from "../run";
@@ -113,15 +115,15 @@ export function AskPage() {
       </div>
 
       {needsKey && (
-        <div className="banner" style={{ marginTop: 14 }}>
-          <div>
-            Claude needs an API key. Create one at platform.claude.com, then start the server with it:
-            <pre className="setup">export ANTHROPIC_API_KEY=sk-ant-...{"\n"}python -m app</pre>
-            Until then you can try the extractive baseline.
+        <div className="banner" style={{ marginTop: 14, display: "block" }}>
+          <p style={{ marginBottom: 10 }}>
+            Claude needs an API key. Paste one here (create it at platform.claude.com), or use the extractive baseline for now.
+          </p>
+          <KeyForm compact />
+          <div className="row" style={{ gap: 8, marginTop: 10 }}>
+            <button type="button" className="btn small" onClick={() => setGenerator("extractive")}>Use the baseline</button>
+            <Link to="/settings" className="small">Key settings</Link>
           </div>
-          <button type="button" className="btn small" onClick={() => setGenerator("extractive")}>
-            Use the baseline
-          </button>
         </div>
       )}
       {ask.error && <div style={{ marginTop: 14 }}><ErrorBanner error={ask.error} /></div>}

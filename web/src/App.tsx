@@ -1,7 +1,7 @@
 // Routes and the app shell. To add a page: add a route here, a nav link
 // in Shell, and its API hooks in api/hooks.ts.
 import { createBrowserRouter, Navigate, NavLink, Outlet, RouterProvider } from "react-router-dom";
-import { useMeta, useQuestions } from "./api/hooks";
+import { useLlm, useMeta, useQuestions } from "./api/hooks";
 import { ErrorBanner, Logo } from "./components/ui";
 import { AskPage } from "./pages/AskPage";
 import { PaperPage } from "./pages/PaperPage";
@@ -12,6 +12,7 @@ import { SearchPage } from "./pages/SearchPage";
 import { ComparePage } from "./pages/ComparePage";
 import { ResultPage } from "./pages/ResultPage";
 import { ResultsPage } from "./pages/ResultsPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { useRun } from "./run";
 
 function RunPicker() {
@@ -36,6 +37,7 @@ function RunPicker() {
 function Shell() {
   const meta = useMeta();
   const questions = useQuestions();
+  const llm = useLlm();
   const c = meta.data?.corpus;
   return (
     <div className="shell">
@@ -54,6 +56,10 @@ function Shell() {
           </NavLink>
           <NavLink to="/search">Search</NavLink>
           <NavLink to="/results">Results</NavLink>
+          <NavLink to="/settings">
+            Settings
+            {llm.data && !llm.data.configured && <span className="dot problem" title="No API key yet" aria-label="No API key yet" />}
+          </NavLink>
         </nav>
         <div className="sidebar-foot">
           <RunPicker />
@@ -97,6 +103,7 @@ const router = createBrowserRouter([
       { path: "results", element: <ResultsPage /> },
       { path: "results/compare", element: <ComparePage /> },
       { path: "results/:name", element: <ResultPage /> },
+      { path: "settings", element: <SettingsPage /> },
       { path: "*", element: <Navigate to="/questions" replace /> },
     ],
   },

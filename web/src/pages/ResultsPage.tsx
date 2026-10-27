@@ -209,7 +209,7 @@ function RunEvalPanel() {
       </div>
       {needsKey && (
         <p className="small" style={{ color: "var(--warn)", marginTop: 8 }}>
-          Claude needs ANTHROPIC_API_KEY set where the server runs. Without it, pick the extractive baseline with no judge.
+          Claude needs an API key: add one in <Link to="/settings">Settings</Link>. Without it, pick the extractive baseline with no judge.
         </p>
       )}
       {fileErrors > 0 && <p className="small" style={{ color: "var(--warn)", marginTop: 8 }}>questions.yaml has problems; fix them on the Questions tab first.</p>}

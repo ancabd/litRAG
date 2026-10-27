@@ -255,6 +255,22 @@ export function useSetVerdict(name: string) {
 
 export const useLlm = () => useQuery({ queryKey: ["llm"], queryFn: () => api.get<LlmStatus>("/llm") });
 
+export function useSetKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (b: { key: string; remember: boolean }) => api.put<LlmStatus>("/llm/key", b),
+    onSuccess: (st) => qc.setQueryData(["llm"], st),
+  });
+}
+
+export function useRemoveKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.del<LlmStatus>("/llm/key"),
+    onSuccess: (st) => qc.setQueryData(["llm"], st),
+  });
+}
+
 export function useAsk() {
   const { run } = useRun();
   return useMutation({

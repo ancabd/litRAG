@@ -123,10 +123,11 @@ class AnthropicLLM(LLM):
 
     def __init__(self, model: str = DEFAULT_MODEL, api_key: str | None = None, timeout: float = 120.0):
         super().__init__(model)
-        key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+        from .keys import current_key
+        key = api_key or current_key()[0]
         if not key:
-            raise LLMNotConfigured("No ANTHROPIC_API_KEY set. Create a key at https://platform.claude.com and "
-                                   "export ANTHROPIC_API_KEY=... before starting (or pass --api-key).")
+            raise LLMNotConfigured("No Anthropic API key. Create one at https://platform.claude.com, then enter it in "
+                                   "the app (Settings) or export ANTHROPIC_API_KEY=... before starting.")
         try:
             import anthropic
         except ImportError as exc:  # pragma: no cover - dependency is in requirements.txt

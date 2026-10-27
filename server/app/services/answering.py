@@ -1,10 +1,9 @@
 """Answering questions from the corpus (the Ask page), and the generator/judge setup shared with answer evals."""
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
-from ..core import DEFAULT_MODEL, PRICES, LLMNotConfigured, available_generators, get_generator
+from ..core import DEFAULT_MODEL, PRICES, LLMNotConfigured, available_generators, get_generator, keys
 from .chunks import RunData
 from .evidence import chunk_view
 
@@ -15,7 +14,8 @@ class AnsweringService:
 
     def status(self) -> dict:
         return {
-            "configured": bool(os.environ.get("ANTHROPIC_API_KEY")),
+            "configured": keys.current_key()[0] is not None,
+            "key": keys.status(),
             "generators": available_generators(),
             "default_model": DEFAULT_MODEL,
             "models": list(PRICES),

@@ -345,8 +345,18 @@ export interface AskResult extends Answer {
   passages: (SearchHit & { cited_as: number | null })[];
 }
 
+export interface KeyStatus {
+  configured: boolean;
+  source: "session" | "environment" | "saved" | null;
+  hint: string | null; // last four characters, e.g. "…a1b2"
+  saved: boolean;
+  environment: boolean;
+  key_file: string;
+}
+
 export interface LlmStatus {
   configured: boolean;
+  key: KeyStatus;
   generators: string[];
   default_model: string;
   models: string[];
