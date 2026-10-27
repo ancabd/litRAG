@@ -1,10 +1,14 @@
-// Review what the retriever returns for a question and judge each passage ("pooling").
+// Review what retrieval returns for a question and judge each passage ("pooling").
+// By default the top passages of every retriever (BM25, dense, hybrid) are merged, so judgments
+// cover what any of them would rank; each passage shows which retrievers found it and where.
 // Passages that answer it become alternatives (lenient scoring); the rest are recorded as
 // not relevant, so they're never reviewed twice. Judgments are saved straight to the file.
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useJudge, useReview } from "../api/hooks";
 import type { Question, ReviewHit } from "../api/types";
 import { ChunkCard } from "./ChunkCard";
+import { DenseNote, RetrieverSelect, shortRetriever } from "./RetrieverSelect";
 import { ErrorBanner } from "./ui";
 
 const LABEL = {
@@ -16,7 +20,9 @@ const LABEL = {
 
 export function ReviewPanel({ question, dirty, version }: { question: Question; dirty: boolean; version: string }) {
   const [open, setOpen] = useState(false);
-  const review = useReview(question.id, open);
+  const [retriever, setRetriever] = useState("pool");
+  const [k, setK] = useState(10);
+  const review = useReview(question.id, open, k, retriever);
   const judge = useJudge();
   const evidence = question.evidence ?? [];
   const multi = evidence.length > 1;
@@ -34,7 +40,7 @@ export function ReviewPanel({ question, dirty, version }: { question: Question; 
         <span className="label">Review retrieved passages</span>
         <span className="spacer" />
         <button type="button" className="btn small" onClick={() => setOpen((v) => !v)}>
-          {open ? "Hide" : "Show what the retriever finds"}
+          {open ? "Hide" : "Show what retrieval finds"}
         </button>
       </div>
       <span className="hint">
@@ -46,11 +52,33 @@ export function ReviewPanel({ question, dirty, version }: { question: Question; 
           {dirty && (
             <div className="banner">Save your changes first. Judgments are written straight to questions.yaml.</div>
           )}
+          <div className="row" style={{ gap: 10, margin: "6px 0 4px" }}>
+            <RetrieverSelect value={retriever} onChange={setRetriever}
+              extra={[{ name: "pool", label: "All retrievers, merged" }]} />
+            <select className="select" value={k} onChange={(e) => setK(Number(e.target.value))} aria-label="Passages per retriever">
+              {[5, 10, 20].map((n) => (
+                <option key={n} value={n}>
+                  top {n}{retriever === "pool" ? " of each" : ""}
+                </option>
+              ))}
+            </select>
+            {review.isFetching && <span className="muted small">Searching…</span>}
+          </div>
+          {retriever !== "pool" && <DenseNote retriever={retriever} />}
           {review.error && <ErrorBanner error={review.error} />}
           {judge.error && <ErrorBanner error={judge.error} />}
           {data && (
             <p className="small muted" style={{ margin: "4px 0 10px" }}>
-              Top {data.items.length} from {data.retriever} on {data.run}: {data.judged} of {data.items.length} judged.
+              {data.retriever === "pool"
+                ? `${data.items.length} passages from the top ${data.k} of ${data.retrievers.map(shortRetriever).join(", ")} on ${data.run}, best rank first`
+                : `Top ${data.items.length} from ${data.retriever} on ${data.run}`}
+              : {data.judged} of {data.items.length} judged.
+              {data.skipped.length > 0 && (
+                <>
+                  {" "}Not included: {data.skipped.map((s) => `${s.label} (${s.reason})`).join(", ")}.{" "}
+                  <Link to="/settings">Build indexes</Link>
+                </>
+              )}
             </p>
           )}
           {data?.items.map((hit) => {
@@ -60,7 +88,17 @@ export function ReviewPanel({ question, dirty, version }: { question: Question; 
             return (
               <div key={hit.chunk_id} className={`review-item j-${kind}`}>
                 <div className="row review-head">
-                  <span className="muted small">#{hit.rank}</span>
+                  {data?.retriever === "pool" ? (
+                    <span className="found-by" title="Rank of this passage in each retriever's results">
+                      {Object.entries(hit.found_by).map(([name, rank]) => (
+                        <span key={name} className="chip">
+                          {shortRetriever(name)} #{rank}
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className="muted small">#{hit.rank}</span>
+                  )}
                   <span className={`pill ${kind === "evidence" || kind === "alternative" ? "ok" : kind === "not_relevant" ? "" : "warn"}`}>
                     {LABEL[kind]}
                     {multi && hit.judgment.item !== null && kind !== "not_relevant" ? `, part ${hit.judgment.item + 1}` : ""}

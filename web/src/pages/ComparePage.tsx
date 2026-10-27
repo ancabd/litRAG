@@ -2,6 +2,7 @@ import { retrieverLabel } from "../components/RetrieverSelect";
 import { Link, useSearchParams } from "react-router-dom";
 import { useCompare } from "../api/hooks";
 import type { Effort, EvalCompare, PairedDiff } from "../api/types";
+import { runLabels } from "../components/runLabels";
 import { ErrorBanner } from "../components/ui";
 import { outcome } from "./ResultPage";
 import { when } from "./ResultsPage";
@@ -72,8 +73,8 @@ function PairedTable({ pair, labels, runName }: {
             <tr>
               <th>Metric</th>
               <th className="num">n</th>
-              <th className="num">Before</th>
-              <th className="num">After</th>
+              <th className="num">{runName(pair.base)}</th>
+              <th className="num">{runName(pair.run)}</th>
               <th>Difference [95% CI]</th>
               <th className="num" title="Questions where the second run did better / worse / the same">Better / worse / same</th>
               <th className="num" title="Two-sided exact sign test on better vs worse">p</th>
@@ -135,6 +136,7 @@ export function ComparePage() {
   const mixed = !!c && c.kinds.length > 1;
   const metrics = answers ? ANSWER_METRICS : METRICS;
   const cellText = answers ? answerText : rankText;
+  const label = c ? runLabels(c.runs, when) : {};
   const setup = (r: EvalCompare["runs"][number]) =>
     r.kind === "answer"
       ? `${r.generator?.name === "agent" ? `agent (${r.generator.model})` : r.generator?.model ?? "extractive"}, ${retrieverLabel(r.retriever)} top ${r.k}, ${r.split}`
@@ -173,9 +175,9 @@ export function ComparePage() {
                   <th>Metric</th>
                   {c.runs.map((r) => (
                     <th key={r.name}>
-                      <Link to={`/results/${r.name}`}>{when(r.created)}</Link>
+                      <Link to={`/results/${r.name}`}>{label[r.name]}</Link>
                       <div className="xs muted" style={{ fontWeight: 450 }}>
-                        {setup(r)}
+                        {setup(r)} · {when(r.created)}
                       </div>
                     </th>
                   ))}
@@ -214,10 +216,7 @@ export function ComparePage() {
                 twenty comparisons shows p &lt; 0.05 by chance.
               </p>
               {c.paired.map((pair) => (
-                <PairedTable key={pair.run} pair={pair} labels={metrics} runName={(n) => {
-                  const r = c.runs.find((x) => x.name === n);
-                  return r ? `${setup(r)} (${when(r.created)})` : n;
-                }} />
+                <PairedTable key={pair.run} pair={pair} labels={metrics} runName={(n) => label[n] ?? n} />
               ))}
             </section>
           )}
@@ -231,7 +230,7 @@ export function ComparePage() {
                     <tr>
                       <th />
                       {c.runs.map((r) => (
-                        <th key={r.name} className="num">{setup(r).split(",")[0]}</th>
+                        <th key={r.name} className="num">{label[r.name]}</th>
                       ))}
                     </tr>
                   </thead>
@@ -264,7 +263,7 @@ export function ComparePage() {
                   <tr>
                     <th>Question</th>
                     {c.runs.map((r) => (
-                      <th key={r.name}>{when(r.created)}</th>
+                      <th key={r.name}>{label[r.name]}</th>
                     ))}
                   </tr>
                 </thead>

@@ -4,5 +4,8 @@
   },
   "q008": {
     "correctness": "partial"
+  },
+  "q002": {
+    "correctness": "correct"
   }
 }

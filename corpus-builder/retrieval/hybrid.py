@@ -1,7 +1,6 @@
 """Hybrid retrieval: BM25 and dense, merged with reciprocal rank fusion (RRF).
 
-    get_retriever("hybrid")             # BM25 + nomic-embed-text v1.5
-    get_retriever("hybrid:bge-small")   # BM25 + BGE small
+    get_retriever("hybrid")             # BM25 + BGE small v1.5 (same as "hybrid:bge-small")
 
 Each retriever ranks the chunks; a chunk's fused score is the sum over the two rankings of
 1 / (k_rrf + rank). RRF uses only ranks, so the two scales (BM25 scores, cosine similarities)

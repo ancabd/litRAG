@@ -2,10 +2,9 @@
 
 Names may carry a variant after a colon, which becomes the retriever's `model` option:
     bm25                 keyword search
-    dense                embeddings, default model (nomic-embed-text v1.5)
-    dense:bge-small      embeddings with BGE small
-    hybrid               BM25 + dense (nomic), fused by rank
-    hybrid:bge-small     BM25 + dense (BGE small)
+    dense:bge-small      embeddings with BGE small v1.5 ("dense" alone means the same)
+    hybrid:bge-small     BM25 + dense (BGE small), fused by rank ("hybrid" alone means the same)
+    dense:<hf id>        any other Hugging Face embedding model, e.g. dense:BAAI/bge-base-en-v1.5
 The same string works everywhere: evaluate.py --retriever, the app's menus, the agent's search.
 
 To add a retriever (e.g. a reranker):
@@ -31,9 +30,7 @@ WITH_MODEL = {"dense", "hybrid"}
 # what the app's menus offer (any other valid name works too)
 CHOICES = [
     {"name": "bm25", "label": "BM25 (keywords)"},
-    {"name": "dense", "label": "Dense: nomic-embed-text v1.5"},
     {"name": "dense:bge-small", "label": "Dense: BGE small v1.5"},
-    {"name": "hybrid", "label": "Hybrid: BM25 + nomic"},
     {"name": "hybrid:bge-small", "label": "Hybrid: BM25 + BGE small"},
 ]
 

@@ -52,6 +52,10 @@
   - paper: W2025444507
     quote: The high accuracy of the method is demonstrated for bulk silicon and compared with empirical potentials
       and DFT
+    alternatives:
+    - paper: W2991697224
+      quote: model given parameters and positions. Here the energy function evaluates the energy for a single configuration;
+        however, for training we often want to evaluate the model over an
 
 - id: q002
   question: What is the functional form of the cutoff function in the original high-dimensional neural network potential?
@@ -65,6 +69,16 @@
   - paper: W2025444507
     quote: 'In order to define the energetically relevant local environment we employ a cutoff function fc of the
       interatomic distance Rij, which has the form fcRij 8< : 0:5 h cos Rij Rc 1 i for Rij Rc; 0 for Rij > Rc:'
+  not_relevant:
+  - paper: W2541404351
+    quote: Behler and Parrinello’s HDNN or HD-Atomic NNP model. A) A scheme showing the algorithmic structure of
+      an atomic number specific neural network potential (NNP). The input molecular coordinates,
+  - paper: W2025444507
+    quote: bias weight that is used as an adjustable offset for the activation functions fka. Activation functions
+      are typically nonlinear functions that introduce the capability to fit nonlinear functions
+  - paper: W4312043350
+    quote: the flexibility and power of a NN is related to the number of layers and nodes but the ability to obtain
+      highly non-linear relationships between inputs and outputs
 
 - id: q003
   question: How are the total energy and the atomic contributions related in a high-dimensional neural network potential?
@@ -92,12 +106,25 @@
     products with spherical harmonics of relative position vectors.
   evidence:
   - paper: W4225405705
-    quote: This work presents Neural Equivariant Interatomic Potentials (NequIP), an E(3)-equivariant neural network
-      approach for learning interatomic potentials from ab-initio calculations for molecular dynamics simulations.
+    quote: Formally, the feature vectors are geometric objects that comprise a direct sum of irreducible representations
+      of the O(3) symmetry group.
     alternatives:
     - paper: W4225405705
       quote: where DX[g] and DY [g] are the representations of the group element g in the vector spaces X and Y
         , respectively. Here, we focus on equivariance with
+    - paper: W4319162181
+      quote: to a group G if f ðDX1⁄2gxÞ = DY1⁄2gf ðxÞ 8g 2 G,8x 2 X ð3Þ where DX[g] ∈GL(X) is the representation
+        of the group element g in
+  not_relevant:
+  - paper: W3172185465
+    quote: 'transformations Uu locally applied to basis: eu →U† u · eu, which are rotations and reflections for
+      Rn. Uu induces transformations on tensor coefficients: T⃗u →(Uu1 ⊗Uu2 ⊗·'
+  - paper: W4406405186
+    quote: been built for entire molecules or structures directly, rather than decomposed into atomic contributions13–15.
+      In parallel to the development of models using descriptors of atom-centred environments, other groups
+  - paper: W4225405705
+    quote: 'only invariant convolutions over scalar features in a SchNet-style fashion. As a first test system we
+      choose bulk water: in particular we use the data set introduced in'
 
 - id: q005
   question: How does NequIP's handling of rotational symmetry differ from the Behler-Parrinello symmetry functions?
@@ -128,14 +155,13 @@
   tags:
   - nequip
   split: dev
-  answer: >-
-    Several design choices come from SchNet. The initial atom features are a trainable embedding of the atomic
+  answer: 'Several design choices come from SchNet. The initial atom features are a trainable embedding of the atomic
     number (one-hot encoded). Atoms then pass through a stack of interaction blocks that do continuous convolutions
     over neighbors within a cutoff. In those convolutions the learnable filter weights are an MLP of the interatomic
-    distance expanded in a radial basis: Gaussians in SchNet, Bessel functions with an envelope in NequIP. The
-    output is per-atom energies summed to a total energy, and forces are its negative gradient. The difference is
-    that NequIP also multiplies the radial part by spherical harmonics of the bond direction. If only l = 0 (scalar)
-    features are kept, NequIP reduces to a SchNet-style invariant network.
+    distance expanded in a radial basis: Gaussians in SchNet, Bessel functions with an envelope in NequIP. The output
+    is per-atom energies summed to a total energy, and forces are its negative gradient. The difference is that
+    NequIP also multiplies the radial part by spherical harmonics of the bond direction. If only l = 0 (scalar)
+    features are kept, NequIP reduces to a SchNet-style invariant network.'
   evidence:
   - paper: W4225405705
     quote: 'The NequIP network architecture, shown in Figure 2, is built on an atomic embedding, followed by a series
@@ -151,8 +177,7 @@
   tags:
   - nequip
   split: dev
-  answer: >-
-    It embeds each atom's chemical species. The atomic number Z_i, one-hot encoded, goes through a trainable
+  answer: It embeds each atom's chemical species. The atomic number Z_i, one-hot encoded, goes through a trainable
     self-interaction (linear) layer. This gives the initial per-atom features, which are scalar (l = 0) only. The
     embedding follows SchNet. Higher-order tensor features first appear in the interaction blocks.
   evidence:
@@ -165,15 +190,11 @@
   question: What datasets is Nequip tested on?
   type: lookup
   split: dev
-  answer: >-
-    1) MD-17 small organic molecules, both the original DFT version and the revised MD-17 (rMD17).
-    2) Small molecules at quantum-chemical accuracy: aspirin at CCSD; benzene, malonaldehyde, toluene and
-       ethanol at CCSD(T).
-    3) Periodic systems:
-       - liquid water and ice
-       - a chemical reaction at a solid/gas interface (formate decomposition on a copper surface)
-       - amorphous lithium phosphate (Li4P2O7)
-       - a lithium superionic conductor (Li6.75P3S11, "LiPS")
+  answer: "1) MD-17 small organic molecules, both the original DFT version and the revised MD-17 (rMD17). 2) Small\
+    \ molecules at quantum-chemical accuracy: aspirin at CCSD; benzene, malonaldehyde, toluene and\n   ethanol at\
+    \ CCSD(T).\n3) Periodic systems:\n   - liquid water and ice\n   - a chemical reaction at a solid/gas interface\
+    \ (formate decomposition on a copper surface)\n   - amorphous lithium phosphate (Li4P2O7)\n   - a lithium superionic\
+    \ conductor (Li6.75P3S11, \"LiPS\")"
   evidence:
   - paper: W4225405705
     quote: 'We validate the proposed method on a diverse series of challenging data sets: first we demonstrate that
@@ -194,12 +215,11 @@
   question: Which other models is Nequip compared to in the original Nequip paper on MD-17?
   type: lookup
   split: dev
-  answer: >-
-    Invariant GNN potentials: SchNet and DimeNet. A shallow neural network: ANI. Kernel methods: GAP, FCHL19/GPR
+  answer: 'Invariant GNN potentials: SchNet and DimeNet. A shallow neural network: ANI. Kernel methods: GAP, FCHL19/GPR
     and sGDML. Other methods: ACE, SpookyNet and GemNet. Other equivariant networks: PaiNN, NewtonNet and UNiTE.
     The paper notes that PaiNN and NewtonNet are restricted to l_max = 1. Results for ACE, GAP and ANI on revised
-    MD-17 are taken from another paper (Kovács et al.), not retrained by the authors. NequIP reports the best
-    accuracy of all of them.
+    MD-17 are taken from another paper (Kovács et al.), not retrained by the authors. NequIP reports the best accuracy
+    of all of them.'
   evidence:
   - paper: W4225405705
     quote: We find that NequIP significantly outperforms invariant GNN-IPs (such as SchNet [9] and DimeNet [11]),
@@ -389,159 +409,176 @@
     dropout.
   notes: 'A near-miss on purpose: the training section looks like it should contain this, so a weak system may invent
     a number. Review the retrieved passages once; if a corpus paper does report SchNet dropout, change the type.'
-    
+
 - id: q023
-  question: What does DiffTRe do differently from backpropagating through an MD simulation, and what does that buy it?
+  question: What does DiffTRe do differently from backpropagating through an MD simulation, and what does that buy
+    it?
   type: lookup
-  tags: [definition, difftre]
+  tags:
+  - definition
+  - difftre
   split: dev
-  answer: >-
-    It doesn't differentiate through the simulation at all. It combines automatic differentiation with MD
-    reweighting, so gradients flow through the reweighted ensemble averages instead of the trajectory. For
-    time-independent observables this avoids exploding gradients and makes gradient computation about two
-    orders of magnitude faster, with memory needs similar to the adjoint method.
+  answer: It doesn't differentiate through the simulation at all. It combines automatic differentiation with MD
+    reweighting, so gradients flow through the reweighted ensemble averages instead of the trajectory. For time-independent
+    observables this avoids exploding gradients and makes gradient computation about two orders of magnitude faster,
+    with memory needs similar to the adjoint method.
   evidence:
-    - paper: W3168247670
-      quote: "DiffTRe offers end-to-end gradient computation and circumvents the need to differentiate through the simulation by combining AD with previous work on MD reweighting schemes"
- 
+  - paper: W3168247670
+    quote: DiffTRe offers end-to-end gradient computation and circumvents the need to differentiate through the
+      simulation by combining AD with previous work on MD reweighting schemes
+
 - id: q024
   question: How are the reweighting weights computed in DiffTRe, and why does the kinetic energy drop out?
   type: lookup
-  tags: [equation, difftre]
+  tags:
+  - equation
+  - difftre
   split: dev
-  answer: >-
-    In the canonical ensemble, each saved state gets w_i = exp(-beta (U_theta(S_i) - U_ref(S_i))), normalized
+  answer: In the canonical ensemble, each saved state gets w_i = exp(-beta (U_theta(S_i) - U_ref(S_i))), normalized
     over all states. Only the potential energy appears because the kinetic energy is the same under the old and
     new potential and cancels in the Boltzmann ratio. With theta equal to the reference, all weights are 1/N.
   evidence:
-    - paper: W3168247670
-      quote: "Inserting pθ(Si) into Eq. (3) allows computing weights as a function of θ (the kinetic energy cancels)"
- 
+  - paper: W3168247670
+    quote: Inserting pθ(Si) into Eq. (3) allows computing weights as a function of θ (the kinetic energy cancels)
+
 - id: q025
   question: When does DiffTRe stop reusing the old trajectory and simulate a new one?
   type: lookup
-  tags: [difftre]
+  tags:
+  - difftre
   split: dev
-  answer: >-
-    When the effective sample size of the reweighted states, N_eff ~ exp(-sum w_i ln w_i), falls below a chosen
-    threshold, meaning a few states dominate the average and its statistical error is too large. A new
-    reference trajectory is then run with the current parameters, starting from the last state of the old one.
+  answer: When the effective sample size of the reweighted states, N_eff ~ exp(-sum w_i ln w_i), falls below a chosen
+    threshold, meaning a few states dominate the average and its statistical error is too large. A new reference
+    trajectory is then run with the current parameters, starting from the last state of the old one.
   evidence:
-    - paper: W3168247670
-      quote: "As soon as Neff < N̄eff, a new reference trajectory needs to be sampled using the current θ as the new ˆθ."
- 
+  - paper: W3168247670
+    quote: As soon as Neff < N̄eff, a new reference trajectory needs to be sampled using the current θ as the new
+      ˆθ.
+
 - id: q026
   question: Which experimental data was the DiffTRe diamond potential trained on?
   type: lookup
-  tags: [numeric, difftre]
+  tags:
+  - numeric
+  - difftre
   split: dev
-  answer: >-
-    The experimental elastic stiffness tensor of diamond, which by cubic symmetry has three moduli: C11 = 1079 GPa,
-    C12 = 124 GPa and C44 = 578 GPa. Training also targeted a stress-free state at zero strain.
+  answer: 'The experimental elastic stiffness tensor of diamond, which by cubic symmetry has three moduli: C11 =
+    1079 GPa, C12 = 124 GPa and C44 = 578 GPa. Training also targeted a stress-free state at zero strain.'
   evidence:
-    - paper: W3168247670
-      quote: "we learn a DimeNet++ [12] potential for diamond from its experimental elastic stiffness tensor C"
- 
+  - paper: W3168247670
+    quote: we learn a DimeNet++ [12] potential for diamond from its experimental elastic stiffness tensor C
+
 - id: q027
   question: Which held-out property did DiffTRe's coarse-grained water model get wrong, and why?
   type: lookup
-  tags: [numeric, difftre]
+  tags:
+  - numeric
+  - difftre
   split: dev
-  answer: >-
-    The self-diffusion coefficient: about 10.9 versus 2.2 μm²/ms in experiment, so diffusion is too fast. Coarse-
-    grained models have smoother energy surfaces, which speeds up their dynamics compared with atomistic models.
-    (The tetrahedral order parameter, by contrast, matched closely.)
+  answer: 'The self-diffusion coefficient: about 10.9 versus 2.2 μm²/ms in experiment, so diffusion is too fast.
+    Coarse- grained models have smoother energy surfaces, which speeds up their dynamics compared with atomistic
+    models. (The tetrahedral order parameter, by contrast, matched closely.)'
   evidence:
-    - paper: W3168247670
-      quote: "The learned CG water model predicts a larger self-diffusion coefficient than were experimentally measured"
-    - paper: W3168247670
-      quote: "Due to smoother PESs, CG models exhibit accelerated dynamical processes compared to atomistic models"
+  - paper: W3168247670
+    quote: The learned CG water model predicts a larger self-diffusion coefficient than were experimentally measured
+  - paper: W3168247670
+    quote: Due to smoother PESs, CG models exhibit accelerated dynamical processes compared to atomistic models
   notes: Two passages from the same paper, but one answer; kept as lookup.
- 
+
 - id: q028
   question: Could you use DiffTRe to fit a potential to a measured diffusion coefficient?
   type: lookup
-  tags: [difftre]
+  tags:
+  - difftre
   split: dev
-  answer: >-
-    No. Reweighting treats the trajectory as a set of states and ignores their order in time, so dynamical
+  answer: No. Reweighting treats the trajectory as a set of states and ignores their order in time, so dynamical
     properties such as diffusion coefficients can't be targets; only time-independent observables can.
   evidence:
-    - paper: W3168247670
-      quote: "The reweighting scheme renders DiffTRe invariant to the sequence of states in the trajectory. Hence, dynamical properties cannot be employed as target observables."
+  - paper: W3168247670
+    quote: The reweighting scheme renders DiffTRe invariant to the sequence of states in the trajectory. Hence,
+      dynamical properties cannot be employed as target observables.
   notes: Phrased without the paper's wording on purpose (diffusion, not "dynamical properties").
- 
+
 - id: q029
-  question: SchNet's C20 force field was trained on DFT data. What do the DiffTRe authors see as the main limitation of that kind of training, and what do they train on instead?
+  question: SchNet's C20 force field was trained on DFT data. What do the DiffTRe authors see as the main limitation
+    of that kind of training, and what do they train on instead?
   type: comparison
-  tags: [difftre, schnet]
+  tags:
+  - difftre
+  - schnet
   split: dev
-  answer: >-
-    SchNet is trained bottom-up on DFT reference calculations (PBE+vdW-TS for C20). DiffTRe's authors argue that
-    bottom-up training is limited by the availability of precise and broad enough quantum data sets, and that its
-    accuracy is capped by the reference method. DiffTRe trains top-down instead, so that simulations reproduce
+  answer: SchNet is trained bottom-up on DFT reference calculations (PBE+vdW-TS for C20). DiffTRe's authors argue
+    that bottom-up training is limited by the availability of precise and broad enough quantum data sets, and that
+    its accuracy is capped by the reference method. DiffTRe trains top-down instead, so that simulations reproduce
     experimental observables.
   evidence:
-    - paper: W2778051509
-      quote: "By training SchNet on DFT data at the PBE+vdWTS level, we reduce the computation time per single point by three orders of magnitude"
-    - paper: W3168247670
-      quote: "Thus, the main obstacle in bottom-up learning of NN potentials is currently limited availability of highly precise and sufficiently broad data sets."
- 
+  - paper: W2778051509
+    quote: By training SchNet on DFT data at the PBE+vdWTS level, we reduce the computation time per single point
+      by three orders of magnitude
+  - paper: W3168247670
+    quote: Thus, the main obstacle in bottom-up learning of NN potentials is currently limited availability of highly
+      precise and sufficiently broad data sets.
+
 - id: q030
-  question: DiffTRe's diamond model starts from an empirical potential originally built for another element. Which potential was it, and which neural network potential paper used that same element as its test system?
+  question: DiffTRe's diamond model starts from an empirical potential originally built for another element. Which
+    potential was it, and which neural network potential paper used that same element as its test system?
   type: multihop
-  tags: [difftre, behler-parrinello]
+  tags:
+  - difftre
+  - behler-parrinello
   split: dev
-  answer: >-
-    The Stillinger-Weber potential parametrized for silicon, rescaled for carbon. Silicon is also the test system
-    of the original Behler-Parrinello neural network potential, which was compared against empirical potentials
+  answer: The Stillinger-Weber potential parametrized for silicon, rescaled for carbon. Silicon is also the test
+    system of the original Behler-Parrinello neural network potential, which was compared against empirical potentials
     and DFT for bulk silicon.
   evidence:
-    - paper: W3168247670
-      quote: "To demonstrate learning, we select the original Stillinger-Weber potential [46] parametrized for silicon as Uprior."
-    - paper: W2025444507
-      quote: "The high accuracy of the method is demonstrated for bulk silicon and compared with empirical potentials and DFT"
+  - paper: W3168247670
+    quote: To demonstrate learning, we select the original Stillinger-Weber potential [46] parametrized for silicon
+      as Uprior.
+  - paper: W2025444507
+    quote: The high accuracy of the method is demonstrated for bulk silicon and compared with empirical potentials
+      and DFT
   notes: Multi-hop on purpose. You need the element from the first passage (silicon) to find the second.
- 
+
 - id: q031
-  question: Which graph neural network does DiffTRe use as its learnable potential, and how does NequIP compare with that family of models on MD-17?
+  question: Which graph neural network does DiffTRe use as its learnable potential, and how does NequIP compare
+    with that family of models on MD-17?
   type: multihop
-  tags: [difftre, nequip]
+  tags:
+  - difftre
+  - nequip
   split: dev
-  answer: >-
-    DimeNet++ (an improved DimeNet), used for both diamond and coarse-grained water. NequIP reports significantly
+  answer: DimeNet++ (an improved DimeNet), used for both diamond and coarse-grained water. NequIP reports significantly
     outperforming invariant graph network potentials, naming SchNet and DimeNet, on MD-17.
   evidence:
-    - paper: W3168247670
-      quote: "Second, we train the state-of-the-art graph neural network potential DimeNet++ [11, 12] for an atomistic model of diamond from its experimental stiffness tensor."
-    - paper: W4225405705
-      quote: "We find that NequIP significantly outperforms invariant GNN-IPs (such as SchNet [9] and DimeNet [11])"
+  - paper: W3168247670
+    quote: Second, we train the state-of-the-art graph neural network potential DimeNet++ [11, 12] for an atomistic
+      model of diamond from its experimental stiffness tensor.
+  - paper: W4225405705
+    quote: We find that NequIP significantly outperforms invariant GNN-IPs (such as SchNet [9] and DimeNet [11])
   notes: NequIP compares against DimeNet, not DimeNet++; the answer should say so rather than blur the two.
- 
+
 - id: q032
   question: In DiffTRe, what is the prior potential for, if not a Bayesian prior?
   type: lookup
-  tags: [definition, difftre]
+  tags:
+  - definition
+  - difftre
   split: dev
-  answer: >-
-    A simple physics-based potential (e.g. a repulsive Lennard-Jones term, or Stillinger-Weber) added to the neural
-    network. Early in training it controls which configurations the simulations visit, and therefore where the
-    gradient carries information. It also gives a physics-informed starting point, so the network learns a
-    correction to the prior. If the data contradicts the prior, the network overrides it.
+  answer: A simple physics-based potential (e.g. a repulsive Lennard-Jones term, or Stillinger-Weber) added to the
+    neural network. Early in training it controls which configurations the simulations visit, and therefore where
+    the gradient carries information. It also gives a physics-informed starting point, so the network learns a correction
+    to the prior. If the data contradicts the prior, the network overrides it.
   evidence:
-    - paper: W3168247670
-      quote: "Rather, the prior serves to control the data (trajectory) generation in the beginning of the optimization."
- 
+  - paper: W3168247670
+    quote: Rather, the prior serves to control the data (trajectory) generation in the beginning of the optimization.
+
 - id: q033
   question: How many GPU hours did it take in total to train the DiffTRe diamond potential?
   type: unanswerable
-  tags: [difftre]
+  tags:
+  - difftre
   split: dev
-  answer: >-
-    Not in the corpus. The main text gives only per-update wall-clock times for the toy example and refers to the
-    supplementary information for the diamond training curve; no total training cost is stated.
-  notes: >-
-    A near-miss on purpose: nearby passages discuss speed-ups and time per update, which a weak system may turn
-    into a made-up total. If you later add the supplementary information to the corpus, check this again.
- 
-
+  answer: Not in the corpus. The main text gives only per-update wall-clock times for the toy example and refers
+    to the supplementary information for the diamond training curve; no total training cost is stated.
+  notes: 'A near-miss on purpose: nearby passages discuss speed-ups and time per update, which a weak system may
+    turn into a made-up total. If you later add the supplementary information to the corpus, check this again.'

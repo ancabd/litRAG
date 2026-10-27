@@ -1617,3 +1617,17 @@ a.cite:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.found-by {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.found-by .chip {
+  font-size: var(--fs-xs);
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

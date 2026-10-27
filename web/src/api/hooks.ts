@@ -171,11 +171,12 @@ export function useSetAbstract() {
 
 // ------------------------------------------------------------------ reviewing retrieved passages
 
-export function useReview(qid: string | undefined, enabled: boolean, k = 10) {
+export function useReview(qid: string | undefined, enabled: boolean, k = 10, retriever = "pool") {
   const { run } = useRun();
   return useQuery({
-    queryKey: ["review", qid, run, k],
-    queryFn: () => api.get<ReviewResult>(`/questions/${encodeURIComponent(qid!)}/review`, { run, k }),
+    queryKey: ["review", qid, run, k, retriever],
+    queryFn: () => api.get<ReviewResult>(`/questions/${encodeURIComponent(qid!)}/review`, { run, k, retriever }),
+    placeholderData: keepPreviousData,
     enabled: !!qid && enabled,
   });
 }

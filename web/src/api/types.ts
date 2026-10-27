@@ -161,12 +161,16 @@ export type JudgmentKind = "evidence" | "alternative" | "not_relevant" | "unjudg
 
 export interface ReviewHit extends SearchHit {
   judgment: { kind: JudgmentKind; item: number | null };
+  found_by: Record<string, number>; // retriever name -> its rank for this passage
 }
 
 export interface ReviewResult {
   version: string;
   run: string;
-  retriever: string;
+  retriever: string; // a retriever name, or "pool"
+  retrievers: string[]; // the ones that were searched
+  skipped: { name: string; label: string; reason: string }[];
+  k: number;
   items: ReviewHit[];
   judged: number;
   evidence: { paper: string; title: string | null }[];
@@ -377,7 +381,7 @@ export interface Job {
 }
 
 export interface EmbeddingIndex {
-  model: string; // preset: "nomic", "bge-small"
+  model: string; // preset, e.g. "bge-small"
   model_id: string;
   note: string;
   chunks: number;

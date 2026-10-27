@@ -38,11 +38,12 @@ CHUNKS = [
 
 
 def test_names_variants_and_slugs():
-    assert all(is_known(n) for n in ["bm25", "dense", "dense:bge-small", "hybrid:nomic", "dense:BAAI/bge-base-en-v1.5"])
-    assert not any(is_known(n) for n in ["bm25:nomic", "dense:nope", "sparse", "hybrid:"[:-1] + ":x"])
+    assert all(is_known(n) for n in ["bm25", "dense", "dense:bge-small", "hybrid", "hybrid:bge-small", "dense:BAAI/bge-base-en-v1.5"])
+    assert not any(is_known(n) for n in ["bm25:bge-small", "dense:nope", "dense:nomic", "sparse", "hybrid:x"])
     r = get_retriever("dense:bge-small")      # no model is loaded until the first index/search
     assert r.config()["model"] == "BAAI/bge-small-en-v1.5" and r.config()["query_prefix"].startswith("Represent")
-    assert get_retriever("hybrid").config()["dense"]["model"] == "nomic-ai/nomic-embed-text-v1.5"
+    assert get_retriever("hybrid").config()["dense"]["model"] == "BAAI/bge-small-en-v1.5"
+    assert get_retriever("dense").config() == get_retriever("dense:bge-small").config()
     assert slug("dense:BAAI/bge-base-en-v1.5") == "dense-BAAI-bge-base-en-v1.5"
     with pytest.raises(ValueError, match="Unknown retriever"):
         get_retriever("dense:nope")
@@ -163,12 +164,13 @@ def test_sentence_transformers_adapter(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "sentence_transformers", types.SimpleNamespace(SentenceTransformer=FakeModel))
     monkeypatch.setattr(dense_mod.SentenceTransformerEmbedder, "_cache", {})
-    r = DenseRetriever("nomic")
+    r = DenseRetriever("bge-small")
     r.index(CHUNKS)
-    assert seen["init"] == ("nomic-ai/nomic-embed-text-v1.5", True, None)
-    assert r.embedder.model.max_seq_length == 2048
-    assert all(t.startswith("search_document: ") for t in seen["texts"])
-    assert r.search("symmetry", k=1)[0].chunk_id == "BP#000" and seen["texts"][-1] == "search_query: symmetry"
+    assert seen["init"] == ("BAAI/bge-small-en-v1.5", False, None)
+    assert r.embedder.model.max_seq_length == 512
+    assert not any(t.startswith("Represent") for t in seen["texts"])  # passages get no prefix
+    q = "Represent this sentence for searching relevant passages: symmetry"
+    assert r.search("symmetry", k=1)[0].chunk_id == "BP#000" and seen["texts"][-1] == q
     assert r.truncated(CHUNKS) == 0
 
 

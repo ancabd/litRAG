@@ -9,15 +9,15 @@
   index    build (and cache) the embeddings for dense / hybrid retrieval, with progress
   compare  put several runs side by side
 
-Retrievers: bm25 (default), dense, dense:bge-small, hybrid, hybrid:bge-small  (dense needs
+Retrievers: bm25 (default), dense:bge-small, hybrid:bge-small  (dense needs
 requirements-dense.txt; the first use of a model embeds the corpus, later uses read the cache)
 
 Examples:
   python evaluate.py check
   python evaluate.py search "radial symmetry function cutoff"
   python evaluate.py run
-  python evaluate.py index --retriever dense            # embed the corpus once (a few minutes on a CPU)
-  python evaluate.py run --retriever hybrid
+  python evaluate.py index --retriever dense:bge-small  # embed the corpus once (about a minute on a CPU)
+  python evaluate.py run --retriever hybrid:bge-small
   python evaluate.py ask "What test system did Behler and Parrinello use?"
   python evaluate.py ask --generator agent "Which cutoff radius does NequIP use, and how does it compare to SchNet?"
   python evaluate.py answer                         # claude-sonnet-5-5 answers, judged by the same model
@@ -277,14 +277,14 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("search", help="query the chunks")
     common(s, questions=False)
     s.add_argument("query")
-    s.add_argument("--retriever", default="bm25", type=retriever_name, help="bm25, dense, dense:bge-small, hybrid, hybrid:bge-small")
+    s.add_argument("--retriever", default="bm25", type=retriever_name, help="bm25, dense:bge-small or hybrid:bge-small")
     s.add_argument("-k", type=int, default=5)
     s.add_argument("--chars", type=int, default=400, help="characters of each chunk to show")
     s.add_argument("--paper", help="only search this paper (OpenAlex id)")
 
     r = sub.add_parser("run", help="score a retriever")
     common(r)
-    r.add_argument("--retriever", default="bm25", type=retriever_name, help="bm25, dense, dense:bge-small, hybrid, hybrid:bge-small")
+    r.add_argument("--retriever", default="bm25", type=retriever_name, help="bm25, dense:bge-small or hybrid:bge-small")
     r.add_argument("--split", default="dev", choices=["dev", "test", "all"])
     r.add_argument("-k", default=",".join(map(str, DEFAULT_KS)), help="cutoffs, e.g. 1,5,10,20")
     r.add_argument("--threshold", type=float, default=0.5)
@@ -295,7 +295,7 @@ def main(argv: list[str] | None = None) -> int:
     from generation.llm import DEFAULT_MODEL
 
     def gen_args(p):
-        p.add_argument("--retriever", default="bm25", type=retriever_name, help="bm25, dense, dense:bge-small, hybrid, hybrid:bge-small")
+        p.add_argument("--retriever", default="bm25", type=retriever_name, help="bm25, dense:bge-small or hybrid:bge-small")
         p.add_argument("-k", type=int, default=8, help="passages per search (default: 8)")
         p.add_argument("--generator", default="claude", choices=available_generators())
         p.add_argument("--model", default=DEFAULT_MODEL, help=f"generator model (default: {DEFAULT_MODEL})")
@@ -321,7 +321,7 @@ def main(argv: list[str] | None = None) -> int:
 
     ix = sub.add_parser("index", help="build the embedding cache for dense / hybrid retrieval")
     common(ix, questions=False)
-    ix.add_argument("--retriever", default="dense", type=retriever_name)
+    ix.add_argument("--retriever", default="dense:bge-small", type=retriever_name)
     ix.add_argument("--query", help="also run this query and print the top 5, as a quick check")
 
     cp = sub.add_parser("compare", help="compare runs")

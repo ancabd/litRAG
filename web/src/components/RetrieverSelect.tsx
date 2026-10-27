@@ -5,9 +5,14 @@ import { ErrorBanner } from "./ui";
 
 export const isDense = (name: string) => name.startsWith("dense") || name.startsWith("hybrid");
 
-export function RetrieverSelect({ value, onChange, id }: { value: string; onChange: (v: string) => void; id?: string }) {
+export function RetrieverSelect({ value, onChange, id, extra = [] }: {
+  value: string;
+  onChange: (v: string) => void;
+  id?: string;
+  extra?: { name: string; label: string }[]; // options before the retrievers, e.g. "all retrievers"
+}) {
   const meta = useMeta();
-  const options = meta.data?.retriever_choices ?? [{ name: "bm25", label: "BM25 (keywords)" }];
+  const options = [...extra, ...(meta.data?.retriever_choices ?? [{ name: "bm25", label: "BM25 (keywords)" }])];
   return (
     <select id={id} className="select" value={value} onChange={(e) => onChange(e.target.value)} aria-label="Retriever">
       {options.map((o) => (
@@ -19,10 +24,16 @@ export function RetrieverSelect({ value, onChange, id }: { value: string; onChan
   );
 }
 
-/** The embedding model a retriever name uses: dense -> nomic, hybrid:bge-small -> bge-small, bm25 -> null. */
+/** The embedding model a retriever name uses: dense / hybrid:bge-small -> bge-small, bm25 -> null. */
+/** Short name for a chip: bm25 -> BM25, dense:bge-small -> Dense, hybrid:bge-small -> Hybrid. */
+export function shortRetriever(name: string): string {
+  const base = name.split(":")[0];
+  return base === "bm25" ? "BM25" : base[0].toUpperCase() + base.slice(1);
+}
+
 export function modelOf(name: string): string | null {
   if (!isDense(name)) return null;
-  return name.split(":")[1] ?? "nomic";
+  return name.split(":")[1] ?? "bge-small";
 }
 
 function IndexLine({ index, installed }: { index: EmbeddingIndex; installed: boolean }) {
@@ -104,7 +115,7 @@ export function IndexPanel() {
   );
 }
 
-/** "bm25", "dense (bge-small)", "hybrid (nomic)" from a run's stored retriever config. */
+/** "bm25", "dense (bge-small)", "hybrid (bge-small)" from a run's stored retriever config. */
 export function retrieverLabel(cfg: { name?: string; preset?: unknown; dense?: unknown } | null | undefined): string {
   if (!cfg?.name) return "";
   if (cfg.name === "dense") return `dense (${String(cfg.preset ?? "")})`;

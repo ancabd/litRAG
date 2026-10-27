@@ -85,3 +85,33 @@ def test_status_flags_broken_alternative(client, data_dir):
     v = client.put("/api/questions/q001", json={"question": q, "version": v}).json()["version"]
     st = client.get("/api/questions").json()["items"][0]["evidence_status"]
     assert st["status"] == "problem" and st["items"][0]["alternatives"][0]["status"] == "not_found"
+
+
+def test_pooled_review_merges_retrievers(client, data_dir, monkeypatch):
+    import time
+    from app.routers import questions as qr
+    from retrieval import dense
+    add_chunks(data_dir)
+    # without built embeddings, the pool is BM25 only and says what it skipped
+    r = client.get("/api/questions/q001/review", params={"retriever": "pool", "k": 3}).json()
+    assert r["retrievers"] == ["bm25"] and {s["name"] for s in r["skipped"]} == {"dense:bge-small", "hybrid:bge-small"}
+    assert all(set(i["found_by"]) == {"bm25"} for i in r["items"])
+
+    # with the stand-in model built, dense and hybrid join the pool
+    monkeypatch.setattr(qr, "retriever_choices", lambda: [{"name": "bm25", "label": "BM25"},
+                                                          {"name": "dense:hash", "label": "Dense"},
+                                                          {"name": "hybrid:hash", "label": "Hybrid"}])
+    job = client.post("/api/indexes", json={"model": "hash"}).json()["job"]
+    for _ in range(200):
+        if client.get(f"/api/jobs/{job['id']}").json()["state"] != "running":
+            break
+        time.sleep(0.02)
+    monkeypatch.setattr(dense, "installed", lambda: True)
+    r = client.get("/api/questions/q001/review", params={"retriever": "pool", "k": 10}).json()
+    assert r["retrievers"] == ["bm25", "dense:hash", "hybrid:hash"] and r["skipped"] == []
+    w1 = next(i for i in r["items"] if i["chunk_id"] == "W1#000")
+    assert len(w1["found_by"]) >= 2 and w1["judgment"]["kind"] == "evidence"
+    best = [min(i["found_by"].values()) for i in r["items"]]
+    assert best == sorted(best)  # ordered by each passage's best rank in any retriever
+    assert len(r["items"]) <= 30 and [i["rank"] for i in r["items"]] == list(range(1, len(r["items"]) + 1))
+    assert client.get("/api/questions/q001/review", params={"retriever": "nope"}).status_code == 400

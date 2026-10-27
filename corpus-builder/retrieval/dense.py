@@ -1,7 +1,7 @@
 """Dense retrieval: embed every chunk once with a local model, then rank by cosine similarity.
 
-    get_retriever("dense")              # nomic-embed-text v1.5 (the default)
-    get_retriever("dense:bge-small")    # BGE small v1.5
+    get_retriever("dense")              # BGE small v1.5 (the default; same as "dense:bge-small")
+    get_retriever("dense:BAAI/bge-base-en-v1.5")   # any other Hugging Face embedding model
     get_retriever("dense:hash")         # no model: hashed bag of words, for tests and offline smoke runs
 
 The corpus is a few thousand chunks, so the index is a plain numpy matrix and a search is
@@ -42,14 +42,11 @@ class Preset:
 
 
 PRESETS: dict[str, Preset] = {
-    "nomic": Preset("nomic-ai/nomic-embed-text-v1.5", "search_query: ", "search_document: ", max_tokens=2048,
-                    trust_remote_code=True,
-                    note="137M parameters, 768 dims, reads whole chunks (we cap at 2048 tokens to bound memory)"),
     "bge-small": Preset("BAAI/bge-small-en-v1.5", "Represent this sentence for searching relevant passages: ", "",
                         max_tokens=512, note="33M parameters, 384 dims, fast; reads the first 512 tokens"),
     "hash": Preset("hash", max_tokens=10**9, note="no model: hashed bag of words, for tests and offline runs"),
 }
-DEFAULT_PRESET = "nomic"
+DEFAULT_PRESET = "bge-small"
 
 
 def preset(name_or_model: str) -> tuple[str, Preset]:
@@ -98,7 +95,7 @@ class SentenceTransformerEmbedder:
         try:
             self.model = SentenceTransformer(p.model, trust_remote_code=p.trust_remote_code,
                                              device=os.environ.get("LITRAG_DEVICE") or None)
-        except ImportError as exc:  # e.g. nomic's custom code needs einops
+        except ImportError as exc:  # a model with custom code may need extra packages
             raise RetrieverUnavailable(f"{p.model} needs another package: {exc}. "
                                        "pip install -r corpus-builder/requirements-dense.txt") from exc
         except (OSError, ValueError) as exc:

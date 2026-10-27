@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from ..core import QuestionFileError, is_retriever
+from ..core import QuestionFileError, dense_retrieval, is_retriever, retriever_choices
 from ..deps import Services, require_run, services
 from ..services.evidence import check_evidence, chunk_view, evidence_summary, judge, judgments
 from ..services.questions import NotFound, VersionConflict
@@ -149,26 +149,64 @@ def _find(svc: Services, qid: str) -> tuple[dict, str]:
     return q, version
 
 
+POOL = "pool"
+
+
+def _pool_members(data) -> tuple[list[str], list[dict]]:
+    """Retrievers to pool: BM25 always; dense ones only if their embeddings are built (building
+    takes minutes, too long for a review request). Returns (names, skipped with reasons)."""
+    names, skipped = [], []
+    for c in retriever_choices():
+        model = dense_retrieval_model(c["name"])
+        if model is None:
+            names.append(c["name"])
+            continue
+        if not dense_retrieval.installed():
+            skipped.append({"name": c["name"], "label": c["label"], "reason": "dense packages not installed"})
+        elif not dense_retrieval.cache_status(data.embeddings_dir, model, data.chunks)["ready"]:
+            skipped.append({"name": c["name"], "label": c["label"], "reason": "embeddings not built yet"})
+        else:
+            names.append(c["name"])
+    return names, skipped
+
+
+def dense_retrieval_model(name: str) -> str | None:
+    base, _, variant = name.partition(":")
+    return (variant or dense_retrieval.DEFAULT_PRESET) if base in ("dense", "hybrid") else None
+
+
 @router.get("/questions/{qid}/review")
 def review(qid: str, run: str | None = None, retriever: str = "bm25", k: int = 10,
            svc: Services = Depends(services)) -> dict:
-    if not is_retriever(retriever):
+    """What retrieval returns for a question, with your judgments. `retriever=pool` merges the top k of
+    every available retriever (pooling): each passage says which retrievers found it and at what rank."""
+    if retriever != POOL and not is_retriever(retriever):
         raise HTTPException(400, f"Unknown retriever {retriever!r}")
     q, version = _find(svc, qid)
     data = require_run(svc, run)
     judged = judgments(data, q)
-    hits = data.search(q["question"], k=max(1, min(k, 50)), retriever=retriever)
+    k = max(1, min(k, 50))
+    names, skipped = _pool_members(data) if retriever == POOL else ([retriever], [])
+    found: dict[str, dict] = {}   # chunk_id -> {retriever: rank}
+    scores: dict[str, float] = {}
+    for name in names:
+        for h in data.search(q["question"], k=k, retriever=name):
+            found.setdefault(h.chunk_id, {})[name] = h.rank
+            scores.setdefault(h.chunk_id, h.score)
+    # best rank first; among equals, the passage more retrievers agree on
+    order = sorted(found, key=lambda cid: (min(found[cid].values()), -len(found[cid]), cid))
     titles = svc.corpus.titles()
     items = []
-    for rank, h in enumerate(hits, 1):
-        c = data.by_id[h.chunk_id]
-        items.append({**chunk_view(c), "rank": rank, "score": round(h.score, 3),
+    for rank, cid in enumerate(order, 1):
+        c = data.by_id[cid]
+        items.append({**chunk_view(c), "rank": rank, "score": round(scores[cid], 3), "found_by": found[cid],
                       "title": c.get("title") or titles.get(c["paper_id"]), "year": c.get("year"),
-                      "judgment": judged.get(h.chunk_id, {"kind": "unjudged", "item": None})})
+                      "judgment": judged.get(cid, {"kind": "unjudged", "item": None})})
     n_judged = sum(i["judgment"]["kind"] != "unjudged" for i in items)
-    return {"version": version, "run": data.name, "retriever": retriever, "items": items,
-            "judged": n_judged, "evidence": [{"paper": e.get("paper"), "title": titles.get(str(e.get("paper")))}
-                                             for e in q.get("evidence") or []]}
+    return {"version": version, "run": data.name, "retriever": retriever, "retrievers": names, "skipped": skipped,
+            "k": k, "items": items, "judged": n_judged,
+            "evidence": [{"paper": e.get("paper"), "title": titles.get(str(e.get("paper")))}
+                         for e in q.get("evidence") or []]}
 
 
 @router.post("/questions/{qid}/judge")

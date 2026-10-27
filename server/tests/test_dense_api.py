@@ -5,7 +5,7 @@ import sys
 def test_meta_lists_retriever_choices(client):
     meta = client.get("/api/meta").json()
     names = [c["name"] for c in meta["retriever_choices"]]
-    assert names[0] == "bm25" and "dense" in names and "hybrid:bge-small" in names and meta["retrievers"] == names
+    assert names == ["bm25", "dense:bge-small", "hybrid:bge-small"] and meta["retrievers"] == names
 
 
 def test_search_with_dense_and_hybrid(client, data_dir):
@@ -39,7 +39,7 @@ def wait_job(client, job_id, tries=200):
 def test_index_status_and_build_with_progress(client, monkeypatch):
     from retrieval import dense
     st = client.get("/api/indexes").json()
-    assert [m["model"] for m in st["models"]] == ["nomic", "bge-small"]
+    assert [m["model"] for m in st["models"]] == ["bge-small"]
     assert all(not m["ready"] and m["embedded"] == 0 and m["chunks"] > 0 for m in st["models"])
 
     monkeypatch.setattr(dense, "installed", lambda: False)

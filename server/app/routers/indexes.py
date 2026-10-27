@@ -12,7 +12,7 @@ from ..core import dense_retrieval
 from ..deps import Services, require_run, services
 
 router = APIRouter(tags=["indexes"])
-MODELS = ("nomic", "bge-small")  # the presets the app offers
+MODELS = ("bge-small",)  # the presets the app offers
 
 
 def _status(svc: Services, run) -> dict:

@@ -127,7 +127,7 @@ class MyGenerator(Generator):
 
 ## Retrievers
 
-`--retriever` takes `bm25` (default), `dense`, `dense:bge-small`, `hybrid` or `hybrid:bge-small` (or `dense:<huggingface id>`); see the top-level README for what each does. Dense ones need `requirements-dense.txt`. `python evaluate.py index --retriever dense` embeds the corpus ahead of time and says how many chunks are longer than the model reads; `--query "..."` adds a quick check of the top 5.
+`--retriever` takes `bm25` (default), `dense:bge-small` or `hybrid:bge-small` (`dense` and `hybrid` alone mean the same), or `dense:<huggingface id>`; see the top-level README for what each does. Dense ones need `requirements-dense.txt`. `python evaluate.py index --retriever dense` embeds the corpus ahead of time and says how many chunks are longer than the model reads; `--query "..."` adds a quick check of the top 5.
 
 ## Adding a retriever
 
