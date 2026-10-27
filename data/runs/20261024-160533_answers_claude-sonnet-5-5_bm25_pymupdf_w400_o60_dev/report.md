@@ -3,16 +3,14 @@
 - **Generator:** `{"name": "claude", "provider": "anthropic", "model": "claude-sonnet-5-5", "prompt": "answer-v1"}`
 - **Judge:** `{"provider": "anthropic", "model": "claude-sonnet-5-5", "prompt": "judge-v1"}`
 - **Retrieval:** bm25, top 8 from pymupdf_w400_o60
-- **Questions:** 32 (split: dev, file sha1 bc8e68a22fcc)
-- **Cost:** generator $0.000, judge $0.000
-
-_No reference answer, so correctness isn't judged: q007, q008, q009, q010._
+- **Questions:** 32 (split: dev, file sha1 487184e30344)
+- **Cost:** generator $0.000, judge $0.011
 
 ## Overall
 
 | metric | value | n |
 |---|---|---|
-| Correct (judge vs your reference) | 0.58 [0.38, 0.77] | 24 |
+| Correct (judge vs your reference) | 0.59 [0.43, 0.75] | 28 |
 | Supported by its citations | 1.00 [1.00, 1.00] | 9 |
 | Cites your evidence | 0.74 [0.53, 0.89] | 19 |
 | Evidence was retrieved | 0.63 [0.44, 0.81] | 27 |
@@ -20,9 +18,9 @@ _No reference answer, so correctness isn't judged: q007, q008, q009, q010._
 | Declines when unanswerable | 1.00 [1.00, 1.00] | 3 |
 | Declines although answerable (lower is better) | 0.31 [0.14, 0.48] | 29 |
 
-Correct when the evidence was retrieved: 0.78 (n=16)
+Correct when the evidence was retrieved: 0.79 (n=17)
 
-Correct when no evidence was retrieved: 0.17 (n=6)
+Correct when no evidence was retrieved: 0.28 (n=9)
 
 ## Effort per question (mean)
 
@@ -67,10 +65,14 @@ Correct when no evidence was retrieved: 0.17 (n=6)
 
 **q007** (comparison): What features does the Nequip architecture use, that are also used by schnet?
 - answer: The passages only describe shared features at a general level. Both NequIP and SchNet are implicit-AEF MLIPs: they learn atomic features (embeddings) rather than using predefined descriptors, and both are graph neural network approaches [W4407925765#013]. Both fit the GNN-IP message-passing framework, in which a stack of message-passing layers updates node features by combining messages from neighboring nodes and edges, followed by a readout layer that predicts atomic energies [W4391631778#006]. Both use only two-body message-passing functions within a cutoff radius [W4391631778#024]. The passages do not give a detailed comparison of other specific architectural components. They also state that, unlike SchNet, NequIP is an equivariant GNN-IP [W4391631778#024].
+- reference: Several design choices come from SchNet. The initial atom features are a trainable embedding of the atomic number (one-hot encoded). Atoms then pass through a stack of interaction blocks that do continuous convolutions over neighbors within a cutoff. In those convolutions the learnable filter weights are an MLP of the interatomic distance expanded in a radial basis: Gaussians in SchNet, Bessel functions with an envelope in NequIP. The output is per-atom energies summed to a total energy, and forces are its negative gradient. The difference is that NequIP also multiplies the radial part by spherical harmonics of the bond direction. If only l = 0 (scalar) features are kept, NequIP reduces to a SchNet-style invariant network.
+- correctness: partial (The answer correctly identifies learned atom embeddings, message-passing/interaction layers over neighbors within a cutoff, and a per-atom energy readout, but it omits the radial-basis MLP filters, the energy-sum with force-gradient design, and the l=0 reduction to SchNet, and it adds a questionable "two-body only" claim.)
 - support: None (judge returned no valid verdict: {)
 
 **q008** (lookup): What does Nequip do as a first step in the architecture?
 - answer: The passages only partly answer this. The simplified NequIP architecture in Figure 2a starts with an Embedding block, followed by interaction blocks and an output block [W4391631778#007]. The forward path takes atomic numbers {Zi} and atomic positions {ri} as input and predicts the energy [W4391631778#007]. The passages do not describe what the embedding computes, and the figure labels are the only mention of it.
+- reference: It embeds each atom's chemical species. The atomic number Z_i, one-hot encoded, goes through a trainable self-interaction (linear) layer. This gives the initial per-atom features, which are scalar (l = 0) only. The embedding follows SchNet. Higher-order tensor features first appear in the interaction blocks.
+- correctness: partial (It correctly identifies the first step as an embedding block that takes atomic numbers, but it explicitly does not describe the one-hot encoding, the linear self-interaction layer, or the scalar-only initial features that the reference specifies.)
 - support: supported (The Embedding → interaction blocks → output block order comes from the figure labels, the forward-path inputs and energy output come from the caption, and the passage does not explain what the embedding computes.)
 
 **q009** (lookup): What datasets is Nequip tested on?
@@ -82,10 +84,20 @@ Correct when no evidence was retrieved: 0.17 (n=6)
 
 
 {"answerable": true, "answer": "The passages show NequIP used on several datasets, but not a single complete list. In the DPA-2 work it was trained single-task on the pre-training datasets (batch size 1, 1M steps) [W4405574099#044], including OC2M, which had to be split into 4 subsets for NequIP and Allegro
+- reference: 1) MD-17 small organic molecules, both the original DFT version and the revised MD-17 (rMD17). 2) Small molecules at quantum-chemical accuracy: aspirin at CCSD; benzene, malonaldehyde, toluene and
+   ethanol at CCSD(T).
+3) Periodic systems:
+   - liquid water and ice
+   - a chemical reaction at a solid/gas interface (formate decomposition on a copper surface)
+   - amorphous lithium phosphate (Li4P2O7)
+   - a lithium superionic conductor (Li6.75P3S11, "LiPS")
+- correctness: partial (The answer correctly mentions MD17, but it omits rMD17, the CCSD/CCSD(T) small-molecule sets, and the periodic systems (water/ice, formate on Cu, Li4P2O7, LiPS), and instead lists other datasets (DPA-2 pre-training, OC2M, 3BPA) that the reference doesn't include.)
 - support: None (judge returned no valid verdict: )
 
 **q010** (lookup): Which other models is Nequip compared to in the original Nequip paper on MD-17?
 - answer: On MD-17 (original and revised), NequIP is compared with invariant GNN-IPs (SchNet and DimeNet), shallow neural networks (ANI), and kernel-based approaches (GAP, FCHL19/GPR, sGDML) [W4225405705#010]. It is also compared with ACE, SpookyNet, GemNet, and other equivariant networks (PaiNN, NewtonNet, UNiTE) [W4225405705#010]. The paper reports that NequIP outperforms all of these methods [W4225405705#011].
+- reference: Invariant GNN potentials: SchNet and DimeNet. A shallow neural network: ANI. Kernel methods: GAP, FCHL19/GPR and sGDML. Other methods: ACE, SpookyNet and GemNet. Other equivariant networks: PaiNN, NewtonNet and UNiTE. The paper notes that PaiNN and NewtonNet are restricted to l_max = 1. Results for ACE, GAP and ANI on revised MD-17 are taken from another paper (Kovács et al.), not retrained by the authors. NequIP reports the best accuracy of all of them.
+- correctness: correct (The answer lists all the same models as the reference (SchNet, DimeNet, ANI, GAP, FCHL19/GPR, sGDML, ACE, SpookyNet, GemNet, PaiNN, NewtonNet, UNiTE) and states NequIP is best; it omits only minor details such as the l_max=1 note and the source of the ACE/GAP/ANI results.)
 - support: supported (Both the list of compared methods (#010) and the claim that NequIP outperforms all other methods (#011) are stated in the cited passages.)
 
 **q011** (lookup): How does SchNet turn an interatomic distance into the input of its filter network?

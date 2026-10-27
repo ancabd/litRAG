@@ -145,34 +145,31 @@ function RunEvalPanel() {
       </div>
       {kind === "answer" && (
         <div className="row" style={{ marginTop: 10, gap: 14 }}>
-          <label className="inline-field">
-            <span>Answered by</span>
-            <select
-              className="select"
-              value={generator === "extractive" ? "extractive" : `${generator}:${genModel}`}
-              onChange={(e) => {
-                const [g, m] = e.target.value.split(":");
-                setGenerator(g as "claude" | "agent" | "extractive");
-                if (m) setModel(m);
-              }}
-            >
-              <optgroup label="Single shot: one search, then answer">
+          <div className="inline-field">
+            <span>Method</span>
+            <Seg
+              label="Method"
+              value={generator}
+              onChange={setGenerator}
+              options={[
+                { value: "claude", label: "Single shot" },
+                { value: "agent", label: "Agent" },
+                { value: "extractive", label: "Extractive baseline" },
+              ]}
+            />
+          </div>
+          {usesModel && (
+            <label className="inline-field">
+              <span>Model</span>
+              <select className="select" value={genModel} onChange={(e) => setModel(e.target.value)}>
                 {models.map((m) => (
-                  <option key={m} value={`claude:${m}`}>
+                  <option key={m} value={m}>
                     {m}
                   </option>
                 ))}
-              </optgroup>
-              <optgroup label="Agent: searches and reads until it can answer">
-                {models.map((m) => (
-                  <option key={m} value={`agent:${m}`}>
-                    agent, {m}
-                  </option>
-                ))}
-              </optgroup>
-              <option value="extractive">Extractive baseline (no model)</option>
-            </select>
-          </label>
+              </select>
+            </label>
+          )}
           <label className="inline-field">
             <span>Judge</span>
             <select className="select" value={judge} onChange={(e) => setJudge(e.target.value)}>

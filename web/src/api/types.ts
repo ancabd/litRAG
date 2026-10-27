@@ -314,7 +314,10 @@ export interface TraceStep {
   input_tokens: number;
   output_tokens: number;
   seconds: number;
+  cache_read_tokens?: number;
   note?: string;
+  thought?: string;
+  error?: boolean;
 }
 
 export interface Answer {
@@ -333,6 +336,7 @@ export interface Answer {
   cached: boolean;
   warnings: string[];
   trace?: TraceStep[]; // absent in runs made before traces existed
+  cache_read_tokens?: number;
 }
 
 export interface AskResult extends Answer {

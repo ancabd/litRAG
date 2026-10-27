@@ -1,9 +1,9 @@
 {
   "kind": "answer",
-  "created": "2026-10-24T13:51:40+00:00",
-  "git_commit": "351a971-dirty",
+  "created": "2026-10-24T14:15:36+00:00",
+  "git_commit": "1b819a1-dirty",
   "questions_file": "/home/anca/Documents/RAG-project/litrag/data/questions/questions.yaml",
-  "questions_sha1": "bc8e68a22fcc",
+  "questions_sha1": "487184e30344",
   "split": "dev",
   "chunks": "/home/anca/Documents/RAG-project/litrag/data/chunks/pymupdf_w400_o60",
   "chunks_config": {
@@ -32,7 +32,7 @@
   "generator": {
     "name": "claude",
     "provider": "anthropic",
-    "model": "claude-sonnet-5-5",
+    "model": "claude-haiku-5-5",
     "prompt": "answer-v1"
   },
   "judge": {
@@ -42,32 +42,27 @@
   },
   "n_questions": 32,
   "n_scored": 32,
-  "no_reference_answer": [
-    "q007",
-    "q008",
-    "q009",
-    "q010"
-  ],
+  "no_reference_answer": [],
   "excluded": [],
   "results": {
     "all": {
       "correct": {
-        "mean": 0.5833333333333334,
-        "lo": 0.375,
-        "hi": 0.7708333333333334,
-        "n": 24
+        "mean": 0.625,
+        "lo": 0.4642857142857143,
+        "hi": 0.7678571428571429,
+        "n": 28
       },
       "supported": {
-        "mean": 1.0,
-        "lo": 1.0,
+        "mean": 0.8571428571428571,
+        "lo": 0.5714285714285714,
         "hi": 1.0,
-        "n": 9
+        "n": 7
       },
       "cites_gold": {
-        "mean": 0.7368421052631579,
-        "lo": 0.5263157894736842,
-        "hi": 0.8947368421052632,
-        "n": 19
+        "mean": 0.6956521739130435,
+        "lo": 0.4782608695652174,
+        "hi": 0.8695652173913043,
+        "n": 23
       },
       "retrieved_gold": {
         "mean": 0.6296296296296297,
@@ -79,7 +74,7 @@
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 20
+        "n": 25
       },
       "abstained_when_unanswerable": {
         "mean": 1.0,
@@ -88,30 +83,30 @@
         "n": 3
       },
       "abstained_when_answerable": {
-        "mean": 0.3103448275862069,
-        "lo": 0.13793103448275862,
-        "hi": 0.4827586206896552,
+        "mean": 0.13793103448275862,
+        "lo": 0.034482758620689655,
+        "hi": 0.27586206896551724,
         "n": 29
       }
     },
     "retrieval:found": {
       "correct": {
-        "mean": 0.78125,
-        "lo": 0.59375,
-        "hi": 0.96875,
-        "n": 16
+        "mean": 0.8529411764705882,
+        "lo": 0.7058823529411765,
+        "hi": 0.9705882352941176,
+        "n": 17
       },
       "supported": {
         "mean": 1.0,
         "lo": 1.0,
         "hi": 1.0,
-        "n": 6
+        "n": 5
       },
       "cites_gold": {
         "mean": 1.0,
         "lo": 1.0,
         "hi": 1.0,
-        "n": 14
+        "n": 16
       },
       "retrieved_gold": {
         "mean": 1.0,
@@ -123,33 +118,33 @@
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 14
+        "n": 16
       },
       "abstained_when_answerable": {
-        "mean": 0.17647058823529413,
+        "mean": 0.058823529411764705,
         "lo": 0.0,
-        "hi": 0.35294117647058826,
+        "hi": 0.17647058823529413,
         "n": 17
       }
     },
     "retrieval:missed": {
       "correct": {
-        "mean": 0.16666666666666666,
-        "lo": 0.0,
-        "hi": 0.5,
-        "n": 6
+        "mean": 0.2777777777777778,
+        "lo": 0.05555555555555555,
+        "hi": 0.5555555555555556,
+        "n": 9
       },
       "supported": {
-        "mean": 1.0,
-        "lo": 1.0,
-        "hi": 1.0,
-        "n": 2
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 1
       },
       "cites_gold": {
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 5
+        "n": 7
       },
       "retrieved_gold": {
         "mean": 0.0,
@@ -161,12 +156,12 @@
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 5
+        "n": 7
       },
       "abstained_when_answerable": {
-        "mean": 0.5,
-        "lo": 0.2,
-        "hi": 0.8,
+        "mean": 0.3,
+        "lo": 0.0,
+        "hi": 0.6,
         "n": 10
       }
     },
@@ -219,12 +214,12 @@
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 1
+        "n": 2
       },
       "abstained_when_answerable": {
-        "mean": 0.5,
+        "mean": 0.0,
         "lo": 0.0,
-        "hi": 1.0,
+        "hi": 0.0,
         "n": 2
       }
     },
@@ -268,22 +263,22 @@
     },
     "tag:difftre": {
       "correct": {
-        "mean": 0.7,
-        "lo": 0.4,
+        "mean": 0.75,
+        "lo": 0.5,
         "hi": 1.0,
         "n": 10
       },
       "supported": {
-        "mean": 1.0,
-        "lo": 1.0,
+        "mean": 0.75,
+        "lo": 0.25,
         "hi": 1.0,
-        "n": 3
+        "n": 4
       },
       "cites_gold": {
-        "mean": 1.0,
-        "lo": 1.0,
+        "mean": 0.8888888888888888,
+        "lo": 0.6666666666666666,
         "hi": 1.0,
-        "n": 7
+        "n": 9
       },
       "retrieved_gold": {
         "mean": 0.8,
@@ -295,7 +290,7 @@
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 7
+        "n": 9
       },
       "abstained_when_unanswerable": {
         "mean": 1.0,
@@ -304,30 +299,24 @@
         "n": 1
       },
       "abstained_when_answerable": {
-        "mean": 0.3,
+        "mean": 0.1,
         "lo": 0.0,
-        "hi": 0.6,
+        "hi": 0.3,
         "n": 10
       }
     },
     "tag:equation": {
       "correct": {
-        "mean": 0.8,
-        "lo": 0.4,
+        "mean": 0.9,
+        "lo": 0.7,
         "hi": 1.0,
         "n": 5
-      },
-      "supported": {
-        "mean": 1.0,
-        "lo": 1.0,
-        "hi": 1.0,
-        "n": 1
       },
       "cites_gold": {
-        "mean": 0.8,
-        "lo": 0.4,
+        "mean": 0.6666666666666666,
+        "lo": 0.3333333333333333,
         "hi": 1.0,
-        "n": 5
+        "n": 6
       },
       "retrieved_gold": {
         "mean": 0.6666666666666666,
@@ -339,12 +328,12 @@
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 5
+        "n": 6
       },
       "abstained_when_answerable": {
-        "mean": 0.16666666666666666,
+        "mean": 0.0,
         "lo": 0.0,
-        "hi": 0.5,
+        "hi": 0.0,
         "n": 6
       }
     },
@@ -365,33 +354,27 @@
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 1
+        "n": 2
       },
       "abstained_when_answerable": {
-        "mean": 0.5,
+        "mean": 0.0,
         "lo": 0.0,
-        "hi": 1.0,
+        "hi": 0.0,
         "n": 2
       }
     },
     "tag:nequip": {
       "correct": {
-        "mean": 0.3,
-        "lo": 0.0,
-        "hi": 0.7,
-        "n": 5
-      },
-      "supported": {
-        "mean": 1.0,
-        "lo": 1.0,
-        "hi": 1.0,
-        "n": 2
+        "mean": 0.5,
+        "lo": 0.2857142857142857,
+        "hi": 0.7142857142857143,
+        "n": 7
       },
       "cites_gold": {
-        "mean": 0.25,
-        "lo": 0.0,
-        "hi": 0.75,
-        "n": 4
+        "mean": 0.5,
+        "lo": 0.16666666666666666,
+        "hi": 0.8333333333333334,
+        "n": 6
       },
       "retrieved_gold": {
         "mean": 0.5714285714285714,
@@ -403,12 +386,12 @@
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 4
+        "n": 6
       },
       "abstained_when_answerable": {
-        "mean": 0.42857142857142855,
-        "lo": 0.14285714285714285,
-        "hi": 0.8571428571428571,
+        "mean": 0.14285714285714285,
+        "lo": 0.0,
+        "hi": 0.42857142857142855,
         "n": 7
       }
     },
@@ -460,22 +443,22 @@
     },
     "tag:schnet": {
       "correct": {
-        "mean": 0.625,
-        "lo": 0.25,
-        "hi": 0.875,
+        "mean": 0.75,
+        "lo": 0.5,
+        "hi": 0.9375,
         "n": 8
       },
       "supported": {
         "mean": 1.0,
         "lo": 1.0,
         "hi": 1.0,
-        "n": 3
+        "n": 1
       },
       "cites_gold": {
-        "mean": 0.6666666666666666,
-        "lo": 0.3333333333333333,
+        "mean": 0.625,
+        "lo": 0.25,
         "hi": 1.0,
-        "n": 6
+        "n": 8
       },
       "retrieved_gold": {
         "mean": 0.5555555555555556,
@@ -487,7 +470,7 @@
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 6
+        "n": 8
       },
       "abstained_when_unanswerable": {
         "mean": 1.0,
@@ -496,24 +479,18 @@
         "n": 1
       },
       "abstained_when_answerable": {
-        "mean": 0.3333333333333333,
+        "mean": 0.1111111111111111,
         "lo": 0.0,
-        "hi": 0.6666666666666666,
+        "hi": 0.3333333333333333,
         "n": 9
       }
     },
     "type:comparison": {
       "correct": {
         "mean": 0.5,
-        "lo": 0.0,
-        "hi": 1.0,
-        "n": 4
-      },
-      "supported": {
-        "mean": 1.0,
-        "lo": 1.0,
-        "hi": 1.0,
-        "n": 1
+        "lo": 0.1,
+        "hi": 0.9,
+        "n": 5
       },
       "cites_gold": {
         "mean": 0.3333333333333333,
@@ -542,22 +519,22 @@
     },
     "type:lookup": {
       "correct": {
-        "mean": 0.7058823529411765,
-        "lo": 0.5,
-        "hi": 0.9117647058823529,
-        "n": 17
+        "mean": 0.7,
+        "lo": 0.525,
+        "hi": 0.875,
+        "n": 20
       },
       "supported": {
-        "mean": 1.0,
-        "lo": 1.0,
+        "mean": 0.8571428571428571,
+        "lo": 0.5714285714285714,
         "hi": 1.0,
-        "n": 8
+        "n": 7
       },
       "cites_gold": {
-        "mean": 0.8125,
-        "lo": 0.625,
-        "hi": 1.0,
-        "n": 16
+        "mean": 0.7222222222222222,
+        "lo": 0.5,
+        "hi": 0.8888888888888888,
+        "n": 18
       },
       "retrieved_gold": {
         "mean": 0.6842105263157895,
@@ -569,21 +546,27 @@
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 17
+        "n": 20
       },
       "abstained_when_answerable": {
-        "mean": 0.19047619047619047,
-        "lo": 0.047619047619047616,
-        "hi": 0.38095238095238093,
+        "mean": 0.047619047619047616,
+        "lo": 0.0,
+        "hi": 0.14285714285714285,
         "n": 21
       }
     },
     "type:multihop": {
       "correct": {
-        "mean": 0.0,
+        "mean": 0.3333333333333333,
         "lo": 0.0,
-        "hi": 0.0,
+        "hi": 0.5,
         "n": 3
+      },
+      "cites_gold": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 2
       },
       "retrieved_gold": {
         "mean": 0.6666666666666666,
@@ -591,9 +574,15 @@
         "hi": 1.0,
         "n": 3
       },
+      "invalid_citations": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 2
+      },
       "abstained_when_answerable": {
-        "mean": 1.0,
-        "lo": 1.0,
+        "mean": 0.3333333333333333,
+        "lo": 0.0,
         "hi": 1.0,
         "n": 3
       }
@@ -613,10 +602,10 @@
     "searches": 1.0,
     "passages_read": 8.0,
     "input_tokens": 6185.53125,
-    "output_tokens": 293.03125,
+    "output_tokens": 459.9375,
     "cache_read_tokens": 0.0,
     "cost": 0.0,
-    "seconds": 0.0001875,
+    "seconds": 0.00015625,
     "total_cost": 0.0,
     "gave_up": 0.0,
     "hit_budget": 0.0
@@ -624,16 +613,16 @@
   "usage": {
     "generator": {
       "input_tokens": 197937,
-      "output_tokens": 9377,
+      "output_tokens": 14718,
       "cost": 0.0
     },
     "judge": {
-      "input_tokens": 54725,
-      "output_tokens": 6850,
+      "input_tokens": 68028,
+      "output_tokens": 9265,
       "cost": 0.0
     }
   },
   "timing": {
-    "total_seconds": 1.7
+    "total_seconds": 1.8
   }
 }

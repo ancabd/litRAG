@@ -128,6 +128,14 @@
   tags:
   - nequip
   split: dev
+  answer: >-
+    Several design choices come from SchNet. The initial atom features are a trainable embedding of the atomic
+    number (one-hot encoded). Atoms then pass through a stack of interaction blocks that do continuous convolutions
+    over neighbors within a cutoff. In those convolutions the learnable filter weights are an MLP of the interatomic
+    distance expanded in a radial basis: Gaussians in SchNet, Bessel functions with an envelope in NequIP. The
+    output is per-atom energies summed to a total energy, and forces are its negative gradient. The difference is
+    that NequIP also multiplies the radial part by spherical harmonics of the bond direction. If only l = 0 (scalar)
+    features are kept, NequIP reduces to a SchNet-style invariant network.
   evidence:
   - paper: W4225405705
     quote: 'The NequIP network architecture, shown in Figure 2, is built on an atomic embedding, followed by a series
@@ -143,6 +151,10 @@
   tags:
   - nequip
   split: dev
+  answer: >-
+    It embeds each atom's chemical species. The atomic number Z_i, one-hot encoded, goes through a trainable
+    self-interaction (linear) layer. This gives the initial per-atom features, which are scalar (l = 0) only. The
+    embedding follows SchNet. Higher-order tensor features first appear in the interaction blocks.
   evidence:
   - paper: W4225405705
     quote: 'Embedding: following SchNet, the initial feature is generated using a trainable embedding that operates
@@ -153,6 +165,15 @@
   question: What datasets is Nequip tested on?
   type: lookup
   split: dev
+  answer: >-
+    1) MD-17 small organic molecules, both the original DFT version and the revised MD-17 (rMD17).
+    2) Small molecules at quantum-chemical accuracy: aspirin at CCSD; benzene, malonaldehyde, toluene and
+       ethanol at CCSD(T).
+    3) Periodic systems:
+       - liquid water and ice
+       - a chemical reaction at a solid/gas interface (formate decomposition on a copper surface)
+       - amorphous lithium phosphate (Li4P2O7)
+       - a lithium superionic conductor (Li6.75P3S11, "LiPS")
   evidence:
   - paper: W4225405705
     quote: 'We validate the proposed method on a diverse series of challenging data sets: first we demonstrate that
@@ -173,6 +194,12 @@
   question: Which other models is Nequip compared to in the original Nequip paper on MD-17?
   type: lookup
   split: dev
+  answer: >-
+    Invariant GNN potentials: SchNet and DimeNet. A shallow neural network: ANI. Kernel methods: GAP, FCHL19/GPR
+    and sGDML. Other methods: ACE, SpookyNet and GemNet. Other equivariant networks: PaiNN, NewtonNet and UNiTE.
+    The paper notes that PaiNN and NewtonNet are restricted to l_max = 1. Results for ACE, GAP and ANI on revised
+    MD-17 are taken from another paper (Kovács et al.), not retrained by the authors. NequIP reports the best
+    accuracy of all of them.
   evidence:
   - paper: W4225405705
     quote: We find that NequIP significantly outperforms invariant GNN-IPs (such as SchNet [9] and DimeNet [11]),

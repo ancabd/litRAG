@@ -1553,3 +1553,37 @@ a.cite:hover {
   color: var(--warn);
   font-weight: 600;
 }
+.steps {
+  margin-top: 14px;
+}
+.steps summary {
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+.trace {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--fs-sm);
+}
+.trace li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 6px;
+}
+.trace-n {
+  color: var(--ink-3);
+  text-align: right;
+}
+.trace-thought {
+  color: var(--ink-2);
+  font-style: italic;
+  margin-top: 2px;
+}
+.trace-error strong {
+  color: var(--warn);
+}
