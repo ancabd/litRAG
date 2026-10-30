@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { useSetVerdict } from "../api/hooks";
 import type { EvalDetail, EvalQuestion, Verdict } from "../api/types";
 import { AnswerText } from "../components/AnswerText";
+import { TraceSteps } from "../components/TraceSteps";
 import { ScoreChart } from "../components/ScoreChart";
 import { ErrorBanner, Seg, TYPE_LABEL } from "../components/ui";
 import { Hit } from "./ResultPage";
@@ -63,6 +64,10 @@ function Row({ run, q }: { run: string; q: EvalQuestion }) {
   const c = q.judgments?.correctness;
   const s = q.judgments?.support;
   const prefix = `${q.id}-p-`;
+  const isAgent = a?.generator?.name === "agent";
+  const hits = new Map(q.retrieved.map((h) => [h.chunk_id, h]));
+  const steps = a?.trace ?? [];
+  const e = q.effort;
   return (
     <li className="eval-q">
       <button type="button" className="eval-q-head" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
@@ -70,6 +75,11 @@ function Row({ run, q }: { run: string; q: EvalQuestion }) {
         <span className="eval-q-text">{q.question}</span>
         <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
           {q.human && <span className="pill" title="You graded this answer">Checked</span>}
+          {isAgent && q.effort && (
+            <span className={`pill ${q.effort.hit_budget ? "warn" : ""}`} title="Tool calls the agent made">
+              {q.effort.hit_budget ? "Out of budget" : `${q.effort.tool_calls} step${q.effort.tool_calls === 1 ? "" : "s"}`}
+            </span>
+          )}
           <Outcome q={q} />
         </span>
       </button>
@@ -118,7 +128,40 @@ function Row({ run, q }: { run: string; q: EvalQuestion }) {
           )}
           {q.reference && a.answerable && <YourVerdict run={run} q={q} />}
 
-          <h3 style={{ marginTop: 14 }}>Passages it was given</h3>
+          {isAgent && steps.length > 0 && (
+            <>
+              <h3 style={{ marginTop: 14 }}>How it got there</h3>
+              <div className="trace-legend" aria-hidden="true">
+                <span className="tp tp-evidence">your evidence</span>
+                <span className="tp tp-alternative">an alternative</span>
+                <span className="tp">not reviewed</span>
+                <span>numbers: cited in the answer</span>
+              </div>
+              <TraceSteps
+                steps={steps}
+                anchorPrefix={prefix}
+                passageInfo={(id) => {
+                  const h = hits.get(id);
+                  return { title: h?.title, section: h?.section, label: h?.label.kind, cited: cited.get(id) };
+                }}
+              />
+              {e && (
+                <p className="xs muted" style={{ marginTop: 6 }}>
+                  {e.turns} model call{e.turns === 1 ? "" : "s"}, {e.searches} search{e.searches === 1 ? "" : "es"},{" "}
+                  {e.passages_read} passages read, {e.input_tokens.toLocaleString()} input tokens
+                  {e.cache_read_tokens ? ` (${e.cache_read_tokens.toLocaleString()} cached)` : ""}
+                  {e.cost ? `, $${e.cost.toFixed(4)}` : ""}, {e.seconds.toFixed(1)} s
+                </p>
+              )}
+              {a.warnings.length > 0 && (
+                <ul className="answer-warnings">
+                  {a.warnings.map((w) => <li key={w}>{w}</li>)}
+                </ul>
+              )}
+            </>
+          )}
+
+          <h3 style={{ marginTop: 14 }}>{isAgent ? "Passages it read" : "Passages it was given"}</h3>
           <ol className="hits">
             {q.retrieved.map((h) => (
               <Hit key={h.chunk_id} h={h} anchor={prefix + h.chunk_id} citedAs={cited.get(h.chunk_id)} />
@@ -149,6 +192,7 @@ export function AnswerRun({ r }: { r: EvalDetail }) {
   const shown = r.questions.filter(test[filter]);
   const cost = (r.usage?.generator.cost ?? 0) + (r.usage?.judge?.cost ?? 0);
   const noRef = (r.summary as unknown as { no_reference_answer?: string[] }).no_reference_answer ?? [];
+  const failures = (r.summary as unknown as { judge_failures?: Record<string, string[]> }).judge_failures ?? {};
 
   return (
     <div className="page">
@@ -179,6 +223,13 @@ export function AnswerRun({ r }: { r: EvalDetail }) {
           {r.effort.hit_budget > 0 && ` Ran out of budget on ${Math.round(r.effort.hit_budget * 100)}%.`}
         </p>
       )}
+      {Object.entries(failures).map(([kind, ids]) => (
+        <div key={kind} className="banner" style={{ marginBottom: 12 }}>
+          The judge gave no valid {kind} verdict for {ids.length} question{ids.length === 1 ? "" : "s"} ({ids.join(", ")}), so{" "}
+          {ids.length === 1 ? "it is" : "they are"} missing from "{kind === "support" ? "Supported" : "Correct"}" rather than scored.
+          Run this setup again to retry just those: everything else comes from the cache.
+        </div>
+      ))}
       <ScoreChart results={all} metrics={METRICS} strictLabel={null} />
       <p className="xs muted" style={{ marginTop: 6, maxWidth: "80ch" }}>
         Correct is the judge's grade against your reference (partial counts half). Supported asks whether the cited passages back the

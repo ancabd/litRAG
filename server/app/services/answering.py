@@ -35,9 +35,10 @@ class AnsweringService:
         return Judge(make_llm(model, self.cache_dir))
 
     def ask(self, run: RunData, question: str, retriever: str, generator: str, model: str | None, k: int,
-            titles: dict[str, str]) -> dict:
-        gen = self.generator(generator, model)
-        ans = gen.answer(question, run, k=k, retriever=retriever)
+            titles: dict[str, str], on_step=None, gen=None) -> dict:
+        """Answer one question. `on_step(step)` gets each trace step as it happens (for streaming)."""
+        gen = gen or self.generator(generator, model)
+        ans = gen.answer(question, run, k=k, retriever=retriever, on_step=on_step)
         cited = {cid: i for i, cid in enumerate(ans.citations, 1)}
         passages = []
         for p in ans.passages:
@@ -46,6 +47,18 @@ class AnsweringService:
                              "title": c.get("title") or titles.get(c["paper_id"]), "year": c.get("year"),
                              "authors": c.get("authors"), "cited_as": cited.get(p["chunk_id"])})
         return {**ans.to_dict(), "run": run.name, "retriever": retriever, "passages": passages}
+
+
+    @staticmethod
+    def step_view(step: dict, run: RunData, titles: dict[str, str]) -> dict:
+        """A trace step plus a short description of the passages it returned, for showing it live."""
+        passages = []
+        for cid in step.get("chunks") or []:
+            c = run.by_id.get(cid)
+            if c:
+                passages.append({"chunk_id": cid, "paper_id": c["paper_id"], "section": c.get("section"),
+                                 "title": c.get("title") or titles.get(c["paper_id"]), "year": c.get("year")})
+        return {**step, "passages": passages}
 
 
 __all__ = ["AnsweringService", "LLMNotConfigured"]

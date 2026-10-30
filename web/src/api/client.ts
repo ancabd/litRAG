@@ -21,6 +21,51 @@ function url(path: string, params?: Params): string {
   return `/api${path}${q ? `?${q}` : ""}`;
 }
 
+async function errorFrom(res: Response): Promise<ApiError> {
+  let message = `${res.status} ${res.statusText}`;
+  let details: string[] = [];
+  try {
+    const data = await res.json();
+    const d = data.detail;
+    if (typeof d === "string") message = d;
+    else if (d && typeof d === "object") {
+      message = d.message ?? message;
+      details = d.errors ?? [];
+    }
+  } catch {
+    /* not JSON */
+  }
+  return new ApiError(res.status, message, details);
+}
+
+/** POST, then read newline-delimited JSON events as they arrive (the agent's steps, then its result). */
+export async function streamPost(path: string, body: unknown, onEvent: (e: unknown) => void, signal?: AbortSignal): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(url(path), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
+  } catch (e) {
+    if ((e as Error).name === "AbortError") throw e;
+    throw new ApiError(0, "Can't reach the server. Is it running? Start it with `python -m app` in server/.");
+  }
+  if (!res.ok) throw await errorFrom(res);
+  if (!res.body) throw new ApiError(0, "The server sent no data.");
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (value) buf += decoder.decode(value, { stream: true });
+    let nl: number;
+    while ((nl = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (line) onEvent(JSON.parse(line));
+    }
+    if (done) break;
+  }
+  if (buf.trim()) onEvent(JSON.parse(buf));
+}
+
 async function request<T>(method: string, path: string, params?: Params, body?: unknown): Promise<T> {
   let res: Response;
   try {
@@ -33,22 +78,7 @@ async function request<T>(method: string, path: string, params?: Params, body?: 
   } catch {
     throw new ApiError(0, "Can't reach the server. Is it running? Start it with `python -m app` in server/.");
   }
-  if (!res.ok) {
-    let message = `${res.status} ${res.statusText}`;
-    let details: string[] = [];
-    try {
-      const data = await res.json();
-      const d = data.detail;
-      if (typeof d === "string") message = d;
-      else if (d && typeof d === "object") {
-        message = d.message ?? message;
-        details = d.errors ?? [];
-      }
-    } catch {
-      /* not JSON */
-    }
-    throw new ApiError(res.status, message, details);
-  }
+  if (!res.ok) throw await errorFrom(res);
   return res.json() as Promise<T>;
 }
 

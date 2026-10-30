@@ -148,9 +148,10 @@ class AnthropicLLM(LLM):
                                               messages=[{"role": "user", "content": prompt}])
         except self._anthropic.APIError as exc:
             raise LLMError(f"Anthropic API error: {exc}") from exc
-        text = "".join(getattr(b, "text", "") for b in msg.content)
+        text = "".join(getattr(b, "text", "") for b in msg.content if getattr(b, "type", "text") == "text")
         return LLMResponse(text=text, model=self.model, input_tokens=msg.usage.input_tokens,
-                           output_tokens=msg.usage.output_tokens, seconds=time.perf_counter() - t0)
+                           output_tokens=msg.usage.output_tokens, seconds=time.perf_counter() - t0,
+                           stop_reason=getattr(msg, "stop_reason", None))
 
     def chat(self, system: str, messages: list[dict], tools: list[dict] | None = None,
              max_tokens: int = 1024, cache: bool = False) -> LLMResponse:
@@ -204,6 +205,10 @@ class CachedLLM(LLM):
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(asdict(r)), encoding="utf-8")
         tmp.replace(path)
+
+    def forget(self, system: str, prompt: str, max_tokens: int = 1024) -> None:
+        """Drop one cached complete() response, e.g. an unusable judge verdict, so the next run asks again."""
+        self._path(system, prompt, max_tokens).unlink(missing_ok=True)
 
     def complete(self, system: str, prompt: str, max_tokens: int = 1024) -> LLMResponse:
         path = self._path(system, prompt, max_tokens)

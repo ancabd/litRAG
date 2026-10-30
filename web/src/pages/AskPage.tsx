@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useAsk, useLlm } from "../api/hooks";
-import type { AskResult } from "../api/types";
+import { useAskStream, useLlm } from "../api/hooks";
+import type { AskResult, TraceStep } from "../api/types";
 import { AnswerText } from "../components/AnswerText";
 import { ChunkCard } from "../components/ChunkCard";
 import { KeyForm } from "../components/KeyForm";
@@ -22,9 +22,16 @@ function Meta({ r }: { r: AskResult }) {
   return <p className="xs muted answer-meta">{bits.join(", ")}</p>;
 }
 
+/** What the generator is doing now, from the steps so far. */
+function working(generator: string, steps: TraceStep[]): string {
+  if (generator !== "agent") return steps.length ? "Writing the answer…" : "Searching…";
+  if (!steps.length) return "Reading the question and planning the first search…";
+  return "Reading what came back and deciding what to do next…";
+}
+
 export function AskPage() {
   const llm = useLlm();
-  const ask = useAsk();
+  const ask = useAskStream();
   const { run } = useRun();
   const [question, setQuestion] = useState("");
   const [generator, setGenerator] = useState<"claude" | "agent" | "extractive">("claude");
@@ -33,20 +40,17 @@ export function AskPage() {
   const [retriever, setRetriever] = useState("bm25");
   const [history, setHistory] = useState<AskResult[]>([]);
   const [shown, setShown] = useState<AskResult | null>(null);
+  const [asked, setAsked] = useState("");
 
   const usesModel = generator !== "extractive";
   const needsKey = usesModel && llm.data && !llm.data.configured;
   const submit = () => {
-    if (question.trim().length < 3 || ask.isPending || needsKey) return;
-    ask.mutate(
-      { question: question.trim(), generator, model: usesModel ? model || undefined : undefined, k, retriever },
-      {
-        onSuccess: (r) => {
-          setShown(r);
-          setHistory((h) => [r, ...h.filter((x) => x.question !== r.question)].slice(0, 12));
-        },
-      },
-    );
+    if (question.trim().length < 3 || needsKey) return;
+    setAsked(question.trim());
+    ask.ask({ question: question.trim(), generator, model: usesModel ? model || undefined : undefined, k, retriever }, (r) => {
+      setShown(r);
+      setHistory((h) => [r, ...h.filter((x) => x.question !== r.question)].slice(0, 12));
+    });
   };
   const r = shown;
   const cited = r ? r.passages.filter((p) => p.cited_as).sort((a, b) => a.cited_as! - b.cited_as!) : [];
@@ -106,8 +110,8 @@ export function AskPage() {
           </select>
           <RetrieverSelect value={retriever} onChange={setRetriever} />
           <span className="spacer" />
-          <button type="button" className="btn primary" onClick={submit} disabled={ask.isPending || question.trim().length < 3 || !!needsKey || !run}>
-            {ask.isPending ? (generator === "agent" ? "Searching and reading…" : "Answering…") : "Ask"}
+          <button type="button" className="btn primary" onClick={submit} disabled={question.trim().length < 3 || !!needsKey || !run}>
+            {ask.pending ? "Ask again" : "Ask"}
           </button>
         </div>
         <p className="xs muted" style={{ marginTop: 8 }}>
@@ -132,8 +136,15 @@ export function AskPage() {
       )}
       {ask.error && <div style={{ marginTop: 14 }}><ErrorBanner error={ask.error} /></div>}
 
+      {ask.pending && (
+        <section className="answer live" aria-live="polite">
+          <p className="answer-q">{asked}</p>
+          <TraceSteps steps={ask.steps} working={working(generator, ask.steps)} />
+        </section>
+      )}
+
       {r && (
-        <section className="answer" aria-live="polite" style={{ opacity: ask.isPending ? 0.5 : 1 }}>
+        <section className="answer" aria-live="polite" hidden={ask.pending}>
           <p className="answer-q">{r.question}</p>
           {r.answerable ? (
             <div className="prose answer-text">
@@ -156,7 +167,14 @@ export function AskPage() {
           {r.generator.name === "agent" && r.trace && r.trace.length > 0 && (
             <details className="steps" open>
               <summary>How it got there ({r.trace.length} steps)</summary>
-              <TraceSteps steps={r.trace} />
+              <TraceSteps
+                steps={r.trace}
+                anchorPrefix="p-"
+                passageInfo={(id) => {
+                  const p = r.passages.find((x) => x.chunk_id === id);
+                  return p ? { title: p.title, section: p.section, cited: p.cited_as ?? undefined } : {};
+                }}
+              />
             </details>
           )}
 

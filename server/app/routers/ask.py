@@ -2,11 +2,16 @@
 the generator (an LLM, or the extractive baseline) writes the answer from the top k passages."""
 from __future__ import annotations
 
+import json
+import queue
+import threading
+
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from ..core import DEFAULT_K, LLMError, LLMNotConfigured, is_retriever, keys
+from ..core import DEFAULT_K, LLMError, LLMNotConfigured, RetrieverUnavailable, is_retriever, keys
 from ..deps import Services, require_run, services
 
 router = APIRouter(tags=["ask"])
@@ -81,3 +86,48 @@ async def ask(body: AskIn, svc: Services = Depends(services)) -> dict:
         raise HTTPException(502, str(exc))
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+
+
+@router.post("/ask/stream")
+def ask_stream(body: AskIn, svc: Services = Depends(services)) -> StreamingResponse:
+    """Like /ask, but streams newline-delimited JSON while it works:
+         {"type": "step", "step": {...}}     after each step (search, read_around, ..., answer)
+         {"type": "result", "result": {...}} the same body /ask returns, once at the end
+         {"type": "error", "status": 502, "message": "..."} if it fails after starting
+    Problems found before starting (no API key, unknown retriever) are normal HTTP errors."""
+    if not is_retriever(body.retriever):
+        raise HTTPException(400, f"Unknown retriever {body.retriever!r}")
+    data = require_run(svc, body.run)
+    try:
+        gen = svc.answering.generator(body.generator, body.model)
+    except LLMNotConfigured as exc:
+        raise HTTPException(503, {"message": str(exc), "errors": [], "code": "llm_not_configured"})
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    titles = svc.corpus.titles()
+    events: queue.Queue = queue.Queue()
+
+    def work() -> None:
+        try:
+            result = svc.answering.ask(
+                data, body.question.strip(), body.retriever, body.generator, body.model, body.k, titles, gen=gen,
+                on_step=lambda st: events.put({"type": "step", "step": svc.answering.step_view(st, data, titles)}))
+            events.put({"type": "result", "result": result})
+        except LLMError as exc:
+            events.put({"type": "error", "status": 502, "message": str(exc)})
+        except RetrieverUnavailable as exc:
+            events.put({"type": "error", "status": 503, "message": str(exc)})
+        except Exception as exc:  # noqa: BLE001 - reported to the page instead of a broken stream
+            events.put({"type": "error", "status": 500, "message": f"{type(exc).__name__}: {exc}"})
+        finally:
+            events.put(None)
+
+    threading.Thread(target=work, daemon=True, name="ask-stream").start()
+
+    def lines():
+        while (item := events.get()) is not None:
+            yield json.dumps(item) + "\n"
+
+    # no buffering by proxies, so steps arrive as they happen
+    return StreamingResponse(lines(), media_type="application/x-ndjson",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

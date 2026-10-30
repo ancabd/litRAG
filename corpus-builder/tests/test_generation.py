@@ -220,3 +220,58 @@ def test_cli_answer_and_ask_extractive(setup, tmp_path, capsys):
                           "--generator", "extractive"]) == 0
     out = capsys.readouterr().out
     assert "bulk silicon" in out and "Sources:" in out and "[BP#000]" in out
+
+
+def test_judge_retries_a_cut_off_verdict_and_counts_failures(tmp_path):
+    calls = []
+
+    class CutOffFirst(ScriptedLLM):
+        def complete(self, system, prompt, max_tokens=1024):
+            calls.append(max_tokens)
+            if max_tokens < 2000:  # the first budget is used up by reasoning before the JSON
+                return LLMResponse("Let me check each claim against the passages carefully...", self.model, 900, max_tokens,
+                                   stop_reason="max_tokens")
+            return LLMResponse('{"verdict": "supported", "reason": "all claims in [BP#000]"}', self.model, 900, 200)
+
+    j = Judge(CachedLLM(CutOffFirst(model="claude-sonnet-5-5"), tmp_path))
+    v = j.support("Bulk silicon [BP#000].", [CHUNKS[0]])
+    assert v["verdict"] == "supported" and calls == [1500, 4000] and j.failures == 0
+    assert j.config()["max_tokens"] == 1500
+
+    class Garbage(ScriptedLLM):
+        def complete(self, system, prompt, max_tokens=1024):
+            calls.append(max_tokens)
+            return LLMResponse("I can't decide.", self.model, 100, 10, stop_reason="end_turn")
+
+    calls.clear()
+    cached = CachedLLM(Garbage(model="claude-sonnet-5-5"), tmp_path / "g")
+    j = Judge(cached)
+    bad = j.correctness("q?", "ref", "ans")
+    assert bad["verdict"] is None and bad["error"] and j.failures == 1 and calls == [1500]
+    j.correctness("q?", "ref", "ans")  # not served from the cache: a rerun really retries
+    assert calls == [1500, 1500] and not list((tmp_path / "g").glob("*.json"))
+
+
+def test_answer_eval_lists_judge_failures(tmp_path):
+    cdir = tmp_path / "chunks" / "run"
+    cdir.mkdir(parents=True)
+    (cdir / "chunks.jsonl").write_text("\n".join(json.dumps(c) for c in CHUNKS))
+    q = tmp_path / "q.yaml"
+    q.write_text("""- id: q001
+  question: What test system demonstrated the method?
+  type: lookup
+  split: dev
+  answer: Bulk silicon.
+  evidence:
+  - paper: BP
+    quote: The method is demonstrated for bulk silicon and compared with DFT calculations.
+""")
+    gen = LLMGenerator(ScriptedLLM(lambda s, p: '{"answerable": true, "answer": "Bulk silicon [BP#000]."}'))
+
+    def judge_reply(system, prompt):
+        return '{"verdict": "correct", "reason": "ok"}' if "Answer to grade:" in prompt else "no json at all"
+
+    run_dir = run_answer_eval(q, cdir, gen, Judge(ScriptedLLM(judge_reply)), k=2, out_root=tmp_path / "runs", name="r")
+    summary = json.loads((run_dir / "summary.json").read_text())
+    assert summary["judge_failures"] == {"support": ["q001"]} and "supported" not in summary["results"]["all"]
+    assert "no valid support verdict for 1 question" in (run_dir / "report.md").read_text()

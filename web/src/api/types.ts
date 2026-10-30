@@ -236,6 +236,11 @@ export interface EvalQuestion {
   answer?: Answer;
   judgments?: { correctness?: JudgeVerdict; support?: JudgeVerdict };
   human?: { correctness: Verdict } | null;
+  effort?: {
+    turns: number; tool_calls: number; searches: number; passages_read: number; input_tokens: number;
+    output_tokens: number; cache_read_tokens: number; cost: number | null; seconds: number;
+    gave_up: boolean; hit_budget: boolean;
+  };
 }
 
 export interface EvalDetail extends EvalBrief {
@@ -323,7 +328,14 @@ export interface TraceStep {
   note?: string;
   thought?: string;
   error?: boolean;
+  // streamed steps (Ask) also describe the passages they returned
+  passages?: { chunk_id: string; paper_id: string; title: string | null; section: string | null; year: number | null }[];
 }
+
+export type AskEvent =
+  | { type: "step"; step: TraceStep }
+  | { type: "result"; result: AskResult }
+  | { type: "error"; status: number; message: string };
 
 export interface Answer {
   question: string;

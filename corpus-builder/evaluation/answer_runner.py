@@ -60,6 +60,16 @@ def effort_of(ans) -> dict:
     }
 
 
+def _judge_failures(rows: list[dict]) -> dict:
+    """Questions where the judge gave no valid verdict: they are missing from that metric, not scored 0."""
+    out = {}
+    for kind in ("correctness", "support"):
+        ids = [r["id"] for r in rows if (r["judgments"].get(kind) or {}).get("error")]
+        if ids:
+            out[kind] = ids
+    return out
+
+
 def summarize_effort(rows: list[dict]) -> dict:
     """Means over questions (cost: also the total), plus how often it gave up or ran out of budget."""
     out: dict = {}
@@ -190,6 +200,7 @@ def run_answer_eval(questions_path: Path, chunks_path: Path, generator: Generato
         "excluded": [],
         "results": results,
         "effort": summarize_effort(rows),
+        "judge_failures": _judge_failures(rows),
         "usage": {
             "generator": {"input_tokens": gen_in, "output_tokens": gen_out, "cost": round(gen_cost, 4)},
             "judge": ({"input_tokens": judge.input_tokens, "output_tokens": judge.output_tokens,
@@ -232,6 +243,9 @@ def render_answer_report(summary: dict, rows: list[dict]) -> str:
              f"- **Questions:** {summary['n_scored']} (split: {summary['split']}, file sha1 {summary['questions_sha1']})",
              f"- **Cost:** generator ${summary['usage']['generator']['cost']:.3f}"
              + (f", judge ${summary['usage']['judge']['cost']:.3f}" if summary["usage"]["judge"] else ""), ""]
+    for kind, ids in (summary.get("judge_failures") or {}).items():
+        lines += [f"**The judge gave no valid {kind} verdict for {len(ids)} question(s)**, so they are missing from "
+                  f"that metric: {', '.join(ids)}. Rerun the eval to retry them.", ""]
     if summary["no_reference_answer"]:
         lines += [f"_No reference answer, so correctness isn't judged: {', '.join(summary['no_reference_answer'])}._", ""]
     a = res.get("all", {})

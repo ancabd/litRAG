@@ -1,8 +1,11 @@
 // React Query hooks: caching, refetching and loading states for every API resource.
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "./client";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, ApiError, streamPost } from "./client";
 import type {
+  AskEvent,
   AskResult,
+  TraceStep,
   Chunk,
   EvalBrief,
   Job,
@@ -309,4 +312,57 @@ export function useBuildIndex() {
     mutationFn: (model: string) => api.post<{ job: Job }>("/indexes", { model, run }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["indexes"] }),
   });
+}
+
+// ------------------------------------------------------------------ asking, step by step
+
+export interface AskBody {
+  question: string;
+  generator: string;
+  model?: string;
+  k: number;
+  retriever?: string;
+}
+
+/** Ask with live steps: `steps` fills in while the generator works, then `onResult` gets the answer.
+ *  A new question cancels the one still running. */
+export function useAskStream() {
+  const { run } = useRun();
+  const [steps, setSteps] = useState<TraceStep[]>([]);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const abort = useRef<AbortController | null>(null);
+  useEffect(() => () => abort.current?.abort(), []);
+
+  const ask = useCallback(
+    (body: AskBody, onResult: (r: AskResult) => void) => {
+      abort.current?.abort();
+      const ctrl = new AbortController();
+      abort.current = ctrl;
+      setSteps([]);
+      setError(null);
+      setPending(true);
+      let got = false;
+      streamPost("/ask/stream", { ...body, run }, (raw) => {
+        const e = raw as AskEvent;
+        if (ctrl.signal.aborted) return;
+        if (e.type === "step") setSteps((s) => [...s, e.step]);
+        else if (e.type === "result") {
+          got = true;
+          onResult(e.result);
+        } else if (e.type === "error") setError(new ApiError(e.status, e.message));
+      }, ctrl.signal)
+        .then(() => {
+          if (!got && !ctrl.signal.aborted) setError((prev) => prev ?? new ApiError(0, "The answer stopped before it finished."));
+        })
+        .catch((e: Error) => {
+          if (e.name !== "AbortError") setError(e);
+        })
+        .finally(() => {
+          if (abort.current === ctrl) setPending(false);
+        });
+    },
+    [run],
+  );
+  return { ask, steps, pending, error };
 }

@@ -16,24 +16,54 @@ SUPPORT_SCORE = {"supported": 1.0, "partial": 0.5, "unsupported": 0.0}
 
 
 class Judge:
-    def __init__(self, llm: LLM, max_tokens: int = 300):
-        self.llm, self.max_tokens = llm, max_tokens
+    """`max_tokens` leaves room for the model's own reasoning before the JSON verdict: current models
+    may think first, and that counts toward the limit. (At 300 tokens, support verdicts, which need
+    the most reading, were often cut off before the JSON, and those questions dropped out of the metric.)
+    A verdict that is still cut off is retried once with `retry_tokens`."""
+
+    def __init__(self, llm: LLM, max_tokens: int = 1500, retry_tokens: int = 4000):
+        self.llm, self.max_tokens, self.retry_tokens = llm, max_tokens, retry_tokens
         self.input_tokens = self.output_tokens = 0
         self.cost = 0.0
+        self.failures = 0
 
     def config(self) -> dict:
-        return {**self.llm.config(), "prompt": JUDGE_VERSION}
+        return {**self.llm.config(), "prompt": JUDGE_VERSION, "max_tokens": self.max_tokens}
 
-    def _ask(self, system: str, prompt: str, allowed: dict) -> dict:
-        r = self.llm.complete(system, prompt, self.max_tokens)
+    def _forget(self, system: str, prompt: str, max_tokens: int) -> None:
+        if hasattr(self.llm, "forget"):  # don't keep a useless answer in the cache: a rerun should retry it
+            self.llm.forget(system, prompt, max_tokens)
+
+    def _call(self, system: str, prompt: str, max_tokens: int):
+        r = self.llm.complete(system, prompt, max_tokens)
         self.input_tokens += r.input_tokens
         self.output_tokens += r.output_tokens
         self.cost += r.cost or 0.0
-        data = parse_json(r.text) or {}
+        return r
+
+    @staticmethod
+    def _verdict(text: str, allowed: dict) -> tuple[str | None, str]:
+        data = parse_json(text) or {}
         verdict = str(data.get("verdict", "")).strip().lower()
-        if verdict not in allowed:
-            return {"verdict": None, "score": None, "reason": f"judge returned no valid verdict: {r.text[:200]}"}
-        return {"verdict": verdict, "score": allowed[verdict], "reason": str(data.get("reason", "")).strip()}
+        return (verdict if verdict in allowed else None), str(data.get("reason", "")).strip()
+
+    def _ask(self, system: str, prompt: str, allowed: dict) -> dict:
+        r = self._call(system, prompt, self.max_tokens)
+        verdict, reason = self._verdict(r.text, allowed)
+        if verdict is None and r.stop_reason == "max_tokens" and self.retry_tokens > self.max_tokens:
+            self._forget(system, prompt, self.max_tokens)
+            r = self._call(system, prompt, self.retry_tokens)  # cut off before the JSON: one more try with room
+            verdict, reason = self._verdict(r.text, allowed)
+            if verdict is None:
+                self._forget(system, prompt, self.retry_tokens)
+        elif verdict is None:
+            self._forget(system, prompt, self.max_tokens)
+        if verdict is None:
+            self.failures += 1
+            cut = " (cut off at the output limit)" if r.stop_reason == "max_tokens" else ""
+            return {"verdict": None, "score": None, "error": True,
+                    "reason": f"judge returned no valid verdict{cut}: {r.text[:200]}"}
+        return {"verdict": verdict, "score": allowed[verdict], "reason": reason}
 
     def correctness(self, question: str, reference: str, answer: str) -> dict:
         return self._ask(CORRECTNESS_SYSTEM, correctness_prompt(question, reference, answer), CORRECTNESS_SCORE)

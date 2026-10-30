@@ -99,6 +99,8 @@ Results are also split into `retrieval:found` and `retrieval:missed`. That split
 
 **Reference answers.** `correct` needs the question's `answer` field; questions without one are listed in the report and scored on the other metrics only. Write references as the key facts, not a paragraph: the judge accepts different wording and extra correct detail, but marks contradictions and missing key facts.
 
+**When the judge fails.** The judge answers with a JSON verdict, after reasoning that counts toward its output limit (1500 tokens; a verdict cut off at the limit is retried once with 4000). A verdict that's still unusable leaves that question out of the metric instead of scoring it 0. The run lists those questions (`judge_failures` in `summary.json`, a note at the top of `report.md` and a banner on the run page). Failed verdicts aren't cached, so running the same setup again retries only them. With the earlier 300-token limit, support verdicts were often cut off, which is why "Supported" once covered only 4 questions.
+
 **Can you trust the judge?** An LLM grading an LLM is only worth reporting with evidence that it grades like you do. On an answer run's page in the app, open answers and give your own verdict; the page shows agreement and Cohen's κ (≥ 0.6 is substantial). Your verdicts are saved in the run folder as `human.json`. Grading 15–20 answers is enough at this scale, and it's the number to put in a write-up next to the score.
 
 **The extractive baseline** (`--generator extractive`) needs no key: it returns the retrieved sentence that overlaps most with the question, with its citation, or declines when nothing overlaps. An LLM that doesn't clearly beat it isn't adding much.

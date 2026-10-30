@@ -127,3 +127,41 @@ def test_ask_with_agent_returns_trace(client, monkeypatch):
     assert a["answer"] == "Bulk silicon [W1#000]." and a["citations"] == ["W1#000"]
     assert [s["action"] for s in a["trace"]] == ["search", "answer"] and a["trace"][0]["thought"] == "Searching."
     assert any(p["cited_as"] == 1 for p in a["passages"])
+
+
+def test_ask_stream_sends_steps_then_result(client, monkeypatch):
+    import json as _json
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "corpus-builder"))
+    from generation.agent import AgentGenerator
+    from generation.llm import LLMError, ScriptedLLM
+
+    def respond(system, messages, tools):
+        if len(messages) == 1:
+            return {"text": "Looking for the test system.", "tool_calls": [{"name": "search", "input": {"query": "silicon"}}]}
+        return "Bulk silicon [W1#000]."
+
+    svc = client.app.state.services
+    monkeypatch.setattr(svc.answering, "generator", lambda name, model: AgentGenerator(ScriptedLLM(chat_respond=respond)))
+    with client.stream("POST", "/api/ask/stream", json={"question": "Which material was used?", "generator": "agent"}) as r:
+        assert r.status_code == 200 and r.headers["content-type"].startswith("application/x-ndjson")
+        events = [_json.loads(line) for line in r.iter_lines() if line]
+    assert [e["type"] for e in events] == ["step", "step", "result"]
+    first = events[0]["step"]
+    assert first["action"] == "search" and first["thought"] == "Looking for the test system."
+    assert first["passages"] and {"chunk_id", "title", "section"} <= set(first["passages"][0])
+    assert events[-1]["result"]["answer"] == "Bulk silicon [W1#000]." and len(events[-1]["result"]["trace"]) == 2
+
+    def broken(system, messages, tools):
+        raise LLMError("Anthropic API error: overloaded")
+    monkeypatch.setattr(svc.answering, "generator", lambda name, model: AgentGenerator(ScriptedLLM(chat_respond=broken)))
+    with client.stream("POST", "/api/ask/stream", json={"question": "Which material was used?", "generator": "agent"}) as r:
+        events = [_json.loads(line) for line in r.iter_lines() if line]
+    assert events == [{"type": "error", "status": 502, "message": "Anthropic API error: overloaded"}]
+
+
+def test_ask_stream_reports_setup_problems_as_http_errors(client):
+    r = client.post("/api/ask/stream", json={"question": "Which material was used?", "generator": "claude"})
+    assert r.status_code == 503 and r.json()["detail"]["code"] == "llm_not_configured"
+    assert client.post("/api/ask/stream", json={"question": "abc def", "retriever": "nope"}).status_code == 400
