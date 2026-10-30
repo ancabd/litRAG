@@ -2,7 +2,7 @@
 
     lib = Library.load(paths.default_chunk_run())
     generator = get_generator("claude", model="claude-sonnet-5-5", cache_dir=paths.CACHE / "llm")
-    ans = generator.answer("What test system ...?", lib, k=8)      # or answer_question(...)
+    ans = generator.answer("What test system ...?", lib, k=5)      # or answer_question(...)
     ans.answer, ans.citations, ans.answerable, ans.trace
 
 A generator gets the question and the Library, and decides itself what to read. Single-shot
@@ -27,7 +27,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-from .llm import DEFAULT_MODEL, LLM, LLMResponse, make_llm, parse_json
+from .llm import DEFAULT_K, DEFAULT_MODEL, LLM, LLMResponse, make_llm, parse_json
 from .prompts import ANSWER_SYSTEM, ANSWER_VERSION, answer_prompt
 
 if TYPE_CHECKING:
@@ -150,7 +150,7 @@ class Generator(ABC):
     prompt_version: str | None = None
 
     @abstractmethod
-    def answer(self, question: str, library: "Library", k: int = 8, retriever: str = "bm25",
+    def answer(self, question: str, library: "Library", k: int = DEFAULT_K, retriever: str = "bm25",
                on_step: StepCallback | None = None) -> Answer:
         """Answer `question` from `library`. `k` is the passages per search; `on_step` gets each trace step."""
 
@@ -165,7 +165,7 @@ class SingleShotGenerator(Generator):
     def generate(self, question: str, passages: list[dict]) -> tuple[str, bool, LLMResponse | None, list[str]]:
         """-> (answer text, answerable, llm response or None, warnings)"""
 
-    def answer(self, question, library, k=8, retriever="bm25", on_step=None):
+    def answer(self, question, library, k=DEFAULT_K, retriever="bm25", on_step=None):
         trace = Trace(on_step)
         t = time.perf_counter()
         hits = library.search(question, k=k, retriever=retriever)
@@ -253,7 +253,7 @@ def get_generator(name: str, model: str = DEFAULT_MODEL, cache_dir: Path | None 
     raise ValueError(f"Unknown generator {name!r}. Available: {', '.join(available_generators())}")
 
 
-def answer_question(question: str, library: "Library", generator: Generator, k: int = 8,
+def answer_question(question: str, library: "Library", generator: Generator, k: int = DEFAULT_K,
                     retriever: str = "bm25", on_step: StepCallback | None = None) -> Answer:
     """Shorthand for generator.answer(...)."""
     return generator.answer(question, library, k=k, retriever=retriever, on_step=on_step)

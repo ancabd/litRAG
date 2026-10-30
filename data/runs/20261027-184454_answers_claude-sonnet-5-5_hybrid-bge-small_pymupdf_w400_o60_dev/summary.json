@@ -1,7 +1,7 @@
 {
   "kind": "answer",
-  "created": "2026-10-27T17:34:35+00:00",
-  "git_commit": "273e162-dirty",
+  "created": "2026-10-27T17:44:54+00:00",
+  "git_commit": "6b7d53c-dirty",
   "questions_file": "/home/anca/Documents/RAG-project/litrag/data/questions/questions.yaml",
   "questions_sha1": "9e6de1d92dea",
   "split": "dev",
@@ -22,11 +22,26 @@
     }
   },
   "retriever": {
-    "name": "bm25",
-    "k1": 1.2,
-    "b": 0.75,
-    "include_title": true,
-    "include_section": true
+    "name": "hybrid",
+    "fusion": "rrf",
+    "k_rrf": 60,
+    "candidates": 100,
+    "bm25": {
+      "name": "bm25",
+      "k1": 1.2,
+      "b": 0.75,
+      "include_title": true,
+      "include_section": true
+    },
+    "dense": {
+      "name": "dense",
+      "model": "BAAI/bge-small-en-v1.5",
+      "preset": "bge-small",
+      "query_prefix": "Represent this sentence for searching relevant passages: ",
+      "doc_prefix": "",
+      "max_tokens": 512,
+      "text": "title - section + chunk"
+    }
   },
   "k": 8,
   "generator": {
@@ -47,34 +62,34 @@
   "results": {
     "all": {
       "correct": {
-        "mean": 0.5892857142857143,
-        "lo": 0.42857142857142855,
-        "hi": 0.75,
-        "n": 28
+        "mean": 0.8275862068965517,
+        "lo": 0.7068965517241379,
+        "hi": 0.9310344827586207,
+        "n": 29
       },
       "supported": {
         "mean": 1.0,
         "lo": 1.0,
         "hi": 1.0,
-        "n": 9
+        "n": 7
       },
       "cites_gold": {
-        "mean": 0.7368421052631579,
-        "lo": 0.5263157894736842,
-        "hi": 0.8947368421052632,
-        "n": 19
+        "mean": 0.7692307692307693,
+        "lo": 0.6153846153846154,
+        "hi": 0.9230769230769231,
+        "n": 26
       },
       "retrieved_gold": {
-        "mean": 0.6666666666666666,
-        "lo": 0.48148148148148145,
-        "hi": 0.8518518518518519,
+        "mean": 0.7777777777777778,
+        "lo": 0.6296296296296297,
+        "hi": 0.9259259259259259,
         "n": 27
       },
       "invalid_citations": {
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 20
+        "n": 27
       },
       "abstained_when_unanswerable": {
         "mean": 1.0,
@@ -83,104 +98,110 @@
         "n": 3
       },
       "abstained_when_answerable": {
-        "mean": 0.3103448275862069,
-        "lo": 0.13793103448275862,
-        "hi": 0.4827586206896552,
+        "mean": 0.06896551724137931,
+        "lo": 0.0,
+        "hi": 0.1724137931034483,
         "n": 29
       }
     },
     "retrieval:found": {
       "correct": {
-        "mean": 0.75,
-        "lo": 0.5555555555555556,
-        "hi": 0.9444444444444444,
-        "n": 18
+        "mean": 0.8809523809523809,
+        "lo": 0.7619047619047619,
+        "hi": 0.9761904761904762,
+        "n": 21
       },
       "supported": {
         "mean": 1.0,
         "lo": 1.0,
         "hi": 1.0,
-        "n": 6
+        "n": 5
       },
       "cites_gold": {
         "mean": 1.0,
         "lo": 1.0,
         "hi": 1.0,
-        "n": 14
+        "n": 20
       },
       "retrieved_gold": {
         "mean": 1.0,
         "lo": 1.0,
         "hi": 1.0,
-        "n": 18
+        "n": 21
       },
       "invalid_citations": {
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 14
+        "n": 20
       },
       "abstained_when_answerable": {
-        "mean": 0.2222222222222222,
-        "lo": 0.05555555555555555,
-        "hi": 0.4444444444444444,
-        "n": 18
+        "mean": 0.047619047619047616,
+        "lo": 0.0,
+        "hi": 0.14285714285714285,
+        "n": 21
       }
     },
     "retrieval:missed": {
       "correct": {
-        "mean": 0.3125,
-        "lo": 0.0625,
-        "hi": 0.5625,
-        "n": 8
+        "mean": 0.8333333333333334,
+        "lo": 0.6666666666666666,
+        "hi": 1.0,
+        "n": 6
       },
       "supported": {
         "mean": 1.0,
         "lo": 1.0,
         "hi": 1.0,
-        "n": 2
+        "n": 1
       },
       "cites_gold": {
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 5
+        "n": 6
       },
       "retrieved_gold": {
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 9
+        "n": 6
       },
       "invalid_citations": {
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 5
+        "n": 6
       },
       "abstained_when_answerable": {
-        "mean": 0.4444444444444444,
-        "lo": 0.1111111111111111,
-        "hi": 0.7777777777777778,
-        "n": 9
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 6
       }
     },
     "tag:behler-parrinello": {
       "correct": {
-        "mean": 0.3333333333333333,
-        "lo": 0.0,
-        "hi": 0.6666666666666666,
+        "mean": 0.6666666666666666,
+        "lo": 0.3333333333333333,
+        "hi": 0.9166666666666666,
         "n": 6
+      },
+      "supported": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 1
       },
       "cites_gold": {
         "mean": 1.0,
         "lo": 1.0,
         "hi": 1.0,
-        "n": 2
+        "n": 5
       },
       "retrieved_gold": {
-        "mean": 0.6666666666666666,
-        "lo": 0.3333333333333333,
+        "mean": 1.0,
+        "lo": 1.0,
         "hi": 1.0,
         "n": 6
       },
@@ -188,12 +209,12 @@
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 2
+        "n": 5
       },
       "abstained_when_answerable": {
-        "mean": 0.6666666666666666,
-        "lo": 0.3333333333333333,
-        "hi": 1.0,
+        "mean": 0.16666666666666666,
+        "lo": 0.0,
+        "hi": 0.5,
         "n": 6
       }
     },
@@ -225,8 +246,8 @@
     },
     "tag:definition": {
       "correct": {
-        "mean": 0.9,
-        "lo": 0.7,
+        "mean": 1.0,
+        "lo": 1.0,
         "hi": 1.0,
         "n": 5
       },
@@ -263,8 +284,8 @@
     },
     "tag:difftre": {
       "correct": {
-        "mean": 0.7,
-        "lo": 0.4,
+        "mean": 1.0,
+        "lo": 1.0,
         "hi": 1.0,
         "n": 10
       },
@@ -272,17 +293,17 @@
         "mean": 1.0,
         "lo": 1.0,
         "hi": 1.0,
-        "n": 3
+        "n": 1
       },
       "cites_gold": {
         "mean": 1.0,
         "lo": 1.0,
         "hi": 1.0,
-        "n": 7
+        "n": 10
       },
       "retrieved_gold": {
-        "mean": 0.8,
-        "lo": 0.5,
+        "mean": 1.0,
+        "lo": 1.0,
         "hi": 1.0,
         "n": 10
       },
@@ -290,7 +311,7 @@
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 7
+        "n": 10
       },
       "abstained_when_unanswerable": {
         "mean": 1.0,
@@ -299,18 +320,18 @@
         "n": 1
       },
       "abstained_when_answerable": {
-        "mean": 0.3,
+        "mean": 0.0,
         "lo": 0.0,
-        "hi": 0.6,
+        "hi": 0.0,
         "n": 10
       }
     },
     "tag:equation": {
       "correct": {
-        "mean": 0.8,
-        "lo": 0.4,
+        "mean": 0.8333333333333334,
+        "lo": 0.6666666666666666,
         "hi": 1.0,
-        "n": 5
+        "n": 6
       },
       "supported": {
         "mean": 1.0,
@@ -319,27 +340,27 @@
         "n": 1
       },
       "cites_gold": {
-        "mean": 0.8,
-        "lo": 0.4,
-        "hi": 1.0,
-        "n": 5
+        "mean": 0.5,
+        "lo": 0.16666666666666666,
+        "hi": 0.8333333333333334,
+        "n": 6
       },
       "retrieved_gold": {
-        "mean": 0.6666666666666666,
-        "lo": 0.3333333333333333,
-        "hi": 1.0,
+        "mean": 0.5,
+        "lo": 0.16666666666666666,
+        "hi": 0.8333333333333334,
         "n": 6
       },
       "invalid_citations": {
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 5
+        "n": 6
       },
       "abstained_when_answerable": {
-        "mean": 0.16666666666666666,
+        "mean": 0.0,
         "lo": 0.0,
-        "hi": 0.5,
+        "hi": 0.0,
         "n": 6
       }
     },
@@ -371,39 +392,39 @@
     },
     "tag:nequip": {
       "correct": {
-        "mean": 0.35714285714285715,
-        "lo": 0.14285714285714285,
-        "hi": 0.6428571428571429,
+        "mean": 0.7857142857142857,
+        "lo": 0.5714285714285714,
+        "hi": 0.9285714285714286,
         "n": 7
       },
       "supported": {
         "mean": 1.0,
         "lo": 1.0,
         "hi": 1.0,
-        "n": 2
+        "n": 1
       },
       "cites_gold": {
-        "mean": 0.25,
-        "lo": 0.0,
-        "hi": 0.75,
-        "n": 4
+        "mean": 0.7142857142857143,
+        "lo": 0.42857142857142855,
+        "hi": 1.0,
+        "n": 7
       },
       "retrieved_gold": {
-        "mean": 0.5714285714285714,
-        "lo": 0.14285714285714285,
-        "hi": 0.8571428571428571,
+        "mean": 0.7142857142857143,
+        "lo": 0.42857142857142855,
+        "hi": 1.0,
         "n": 7
       },
       "invalid_citations": {
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 4
+        "n": 7
       },
       "abstained_when_answerable": {
-        "mean": 0.42857142857142855,
-        "lo": 0.14285714285714285,
-        "hi": 0.8571428571428571,
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
         "n": 7
       }
     },
@@ -418,7 +439,7 @@
         "mean": 1.0,
         "lo": 1.0,
         "hi": 1.0,
-        "n": 3
+        "n": 1
       },
       "cites_gold": {
         "mean": 1.0,
@@ -455,10 +476,10 @@
     },
     "tag:schnet": {
       "correct": {
-        "mean": 0.625,
-        "lo": 0.25,
-        "hi": 0.875,
-        "n": 8
+        "mean": 0.9444444444444444,
+        "lo": 0.8333333333333334,
+        "hi": 1.0,
+        "n": 9
       },
       "supported": {
         "mean": 1.0,
@@ -467,10 +488,10 @@
         "n": 3
       },
       "cites_gold": {
-        "mean": 0.6666666666666666,
-        "lo": 0.3333333333333333,
-        "hi": 1.0,
-        "n": 6
+        "mean": 0.5555555555555556,
+        "lo": 0.2222222222222222,
+        "hi": 0.8888888888888888,
+        "n": 9
       },
       "retrieved_gold": {
         "mean": 0.5555555555555556,
@@ -482,7 +503,7 @@
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 6
+        "n": 9
       },
       "abstained_when_unanswerable": {
         "mean": 1.0,
@@ -491,17 +512,17 @@
         "n": 1
       },
       "abstained_when_answerable": {
-        "mean": 0.3333333333333333,
+        "mean": 0.0,
         "lo": 0.0,
-        "hi": 0.6666666666666666,
+        "hi": 0.0,
         "n": 9
       }
     },
     "type:comparison": {
       "correct": {
-        "mean": 0.5,
-        "lo": 0.1,
-        "hi": 0.9,
+        "mean": 0.8,
+        "lo": 0.6,
+        "hi": 1.0,
         "n": 5
       },
       "supported": {
@@ -511,48 +532,48 @@
         "n": 1
       },
       "cites_gold": {
-        "mean": 0.3333333333333333,
-        "lo": 0.0,
+        "mean": 0.8,
+        "lo": 0.4,
         "hi": 1.0,
-        "n": 3
+        "n": 5
       },
       "retrieved_gold": {
-        "mean": 0.4,
-        "lo": 0.0,
-        "hi": 0.8,
+        "mean": 0.8,
+        "lo": 0.4,
+        "hi": 1.0,
         "n": 5
       },
       "invalid_citations": {
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 3
+        "n": 5
       },
       "abstained_when_answerable": {
-        "mean": 0.4,
+        "mean": 0.0,
         "lo": 0.0,
-        "hi": 0.8,
+        "hi": 0.0,
         "n": 5
       }
     },
     "type:lookup": {
       "correct": {
-        "mean": 0.7,
-        "lo": 0.5,
-        "hi": 0.875,
-        "n": 20
+        "mean": 0.8095238095238095,
+        "lo": 0.6666666666666666,
+        "hi": 0.9285714285714286,
+        "n": 21
       },
       "supported": {
         "mean": 1.0,
         "lo": 1.0,
         "hi": 1.0,
-        "n": 8
+        "n": 6
       },
       "cites_gold": {
-        "mean": 0.8125,
-        "lo": 0.625,
-        "hi": 1.0,
-        "n": 16
+        "mean": 0.7222222222222222,
+        "lo": 0.5,
+        "hi": 0.8888888888888888,
+        "n": 18
       },
       "retrieved_gold": {
         "mean": 0.7368421052631579,
@@ -564,32 +585,44 @@
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
-        "n": 17
+        "n": 19
       },
       "abstained_when_answerable": {
-        "mean": 0.19047619047619047,
-        "lo": 0.047619047619047616,
-        "hi": 0.38095238095238093,
+        "mean": 0.09523809523809523,
+        "lo": 0.0,
+        "hi": 0.23809523809523808,
         "n": 21
       }
     },
     "type:multihop": {
       "correct": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 3
+      },
+      "cites_gold": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 3
+      },
+      "retrieved_gold": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 3
+      },
+      "invalid_citations": {
         "mean": 0.0,
         "lo": 0.0,
         "hi": 0.0,
         "n": 3
       },
-      "retrieved_gold": {
-        "mean": 0.6666666666666666,
-        "lo": 0.0,
-        "hi": 1.0,
-        "n": 3
-      },
       "abstained_when_answerable": {
-        "mean": 1.0,
-        "lo": 1.0,
-        "hi": 1.0,
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
         "n": 3
       }
     },
@@ -607,28 +640,28 @@
     "tool_calls": 1.0,
     "searches": 1.0,
     "passages_read": 8.0,
-    "input_tokens": 6185.53125,
-    "output_tokens": 293.03125,
+    "input_tokens": 5699.875,
+    "output_tokens": 292.03125,
     "cache_read_tokens": 0.0,
-    "cost": 0.0,
-    "seconds": 0.0001875,
-    "total_cost": 0.0,
+    "cost": 0.0143200625,
+    "seconds": 2.9718125,
+    "total_cost": 0.4582,
     "gave_up": 0.0,
     "hit_budget": 0.0
   },
   "usage": {
     "generator": {
-      "input_tokens": 197937,
-      "output_tokens": 9377,
-      "cost": 0.0
+      "input_tokens": 182396,
+      "output_tokens": 9345,
+      "cost": 0.4582
     },
     "judge": {
-      "input_tokens": 57523,
-      "output_tokens": 7355,
-      "cost": 0.0
+      "input_tokens": 85936,
+      "output_tokens": 10105,
+      "cost": 0.2729
     }
   },
   "timing": {
-    "total_seconds": 1.8
+    "total_seconds": 219.1
   }
 }

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from ..core import LLMNotConfigured, QuestionFileError, is_retriever
+from ..core import DEFAULT_K, JUDGE_MODEL, LLMNotConfigured, QuestionFileError, is_retriever
 from ..deps import Services, services
 
 router = APIRouter(tags=["evals"])
@@ -19,8 +19,8 @@ class StartEval(BaseModel):
     # answer evals only
     generator: str = "claude"
     model: str | None = None
-    judge: str | None = None    # judge model; "none" for no judge; default: same as generator
-    k: int = 8
+    judge: str | None = None    # judge model; "none" for no judge; default: JUDGE_MODEL (Sonnet), whatever generates
+    k: int = DEFAULT_K
 
 
 class Verdict(BaseModel):
@@ -93,7 +93,7 @@ def _start_answer_eval(body: StartEval, chunks: str, svc: Services) -> dict:
     try:
         load_questions_checked(svc.settings.questions_file)
         gen = svc.answering.generator(body.generator, body.model)
-        judge_model = body.judge or (gen.config().get("model") if body.generator == "claude" else None) or "none"
+        judge_model = body.judge or JUDGE_MODEL
         judge = svc.answering.judge(judge_model)
     except QuestionFileError as exc:
         raise HTTPException(422, {"message": "questions.yaml has problems; fix them before running the eval.",

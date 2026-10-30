@@ -20,7 +20,7 @@ from evaluation.answer_runner import run_answer_eval  # noqa: E402
 from evaluation.judge import Judge, agreement  # noqa: E402
 from evaluation.paired import paired_compare  # noqa: E402
 from evaluation.runner import run_eval  # noqa: E402
-from generation import (DEFAULT_MODEL, PRICES, LLMError, LLMNotConfigured, answer_question,  # noqa: E402
+from generation import (DEFAULT_K, DEFAULT_MODEL, JUDGE_MODEL, PRICES, LLMError, LLMNotConfigured, answer_question,  # noqa: E402
                         available_generators, get_generator)
 from library import Library  # noqa: E402
 from generation import keys  # noqa: E402
@@ -34,7 +34,7 @@ from retrieval import dense as dense_retrieval  # noqa: E402
 from retrieval import get_retriever, load_chunks  # noqa: E402
 from retrieval.base import Retriever  # noqa: E402
 
-__all__ = ["load_questions_checked", "DEFAULT_MODEL", "Judge", "LLMError", "LLMNotConfigured", "PRICES", "agreement", "answer_question",
+__all__ = ["load_questions_checked", "DEFAULT_K", "DEFAULT_MODEL", "JUDGE_MODEL", "Judge", "LLMError", "LLMNotConfigured", "PRICES", "agreement", "answer_question",
            "available_generators", "get_generator", "make_llm", "paired_compare", "run_answer_eval", "run_eval", "Evidence", "MAX_PDF_BYTES", "ManualEditError", "add_manual_pdf", "paper_report", "rebuild_runs",
            "remove_manual_pdf", "set_manual_abstract", "FIELDS", "SPLITS", "TYPES", "GoldIndex", "QuestionFileError", "Retriever", "available_retrievers", "is_retriever", "retriever_choices", "RetrieverUnavailable", "dense_retrieval",
            "Library", "keys", "get_retriever", "load_chunks", "ngrams", "parse_questions", "quote_coverage", "words"]

@@ -364,6 +364,8 @@ export interface LlmStatus {
   key: KeyStatus;
   generators: string[];
   default_model: string;
+  judge_model: string;
+  default_k: number;
   models: string[];
   prices: Record<string, { input: number; output: number }>;
 }

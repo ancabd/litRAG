@@ -29,7 +29,7 @@ export function AskPage() {
   const [question, setQuestion] = useState("");
   const [generator, setGenerator] = useState<"claude" | "agent" | "extractive">("claude");
   const [model, setModel] = useState("");
-  const [k, setK] = useState(8);
+  const [k, setK] = useState(5);
   const [retriever, setRetriever] = useState("bm25");
   const [history, setHistory] = useState<AskResult[]>([]);
   const [shown, setShown] = useState<AskResult | null>(null);

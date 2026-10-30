@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from ..core import LLMError, LLMNotConfigured, is_retriever, keys
+from ..core import DEFAULT_K, LLMError, LLMNotConfigured, is_retriever, keys
 from ..deps import Services, require_run, services
 
 router = APIRouter(tags=["ask"])
@@ -18,7 +18,7 @@ class AskIn(BaseModel):
     retriever: str = "bm25"
     generator: str = "claude"
     model: str | None = None
-    k: int = Field(8, ge=1, le=30)
+    k: int = Field(DEFAULT_K, ge=1, le=30)
 
 
 @router.get("/llm")

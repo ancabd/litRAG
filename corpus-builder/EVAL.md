@@ -81,7 +81,7 @@ Worth committing the `report.md` files: together they're the history of the proj
 
 ## Answer evaluation
 
-`ask` and `answer` need `ANTHROPIC_API_KEY` (create a key at https://platform.claude.com). The options both share: `--retriever`, `--k` (passages per search, default 8), `--generator claude|extractive|agent`, `--model` (default `claude-sonnet-5-5`), `--no-cache`. The agent also takes `--max-turns` (default 8), `--token-budget` (default 100000) and `--tools` (e.g. `search,read_around`, for ablations); how it works is in the top-level README. `answer` also takes `--judge <model>` (default: the generator's model; `none` for no judge), `--split`, `--name`.
+`ask` and `answer` need `ANTHROPIC_API_KEY` (create a key at https://platform.claude.com). The options both share: `--retriever`, `--k` (passages per search, default 5), `--generator claude|extractive|agent`, `--model` (default `claude-sonnet-5-5`), `--no-cache`. The agent also takes `--max-turns` (default 8), `--token-budget` (default 100000) and `--tools` (e.g. `search,read_around`, for ablations); how it works is in the top-level README. `answer` also takes `--judge <model>` (default: `claude-sonnet-5-5` for every generator, so runs are graded alike; `none` for no judge), `--split`, `--name`.
 
 For each question it retrieves the top k passages, asks the model to answer from them only, citing each claim as `[chunk_id]`, or to say the passages don't answer it. Then:
 
@@ -103,7 +103,7 @@ Results are also split into `retrieval:found` and `retrieval:missed`. That split
 
 **The extractive baseline** (`--generator extractive`) needs no key: it returns the retrieved sentence that overlaps most with the question, with its citation, or declines when nothing overlaps. An LLM that doesn't clearly beat it isn't adding much.
 
-**Cost and caching.** Every request and response is cached in `data/cache/llm/`, keyed by model, prompts and token limit, so rerunning the same setup costs nothing and gives the same answers; changing the prompt, model or passages makes new calls. Each run records tokens and dollars for the generator and the judge. With Sonnet, 20 questions with 8 passages each cost a few cents. Prompts are versioned (`generation/prompts.py`) and the version is stored in every run, so bump it when you change a prompt.
+**Cost and caching.** Every request and response is cached in `data/cache/llm/`, keyed by model, prompts and token limit, so rerunning the same setup costs nothing and gives the same answers; changing the prompt, model or passages makes new calls. Each run records tokens and dollars for the generator and the judge. With Sonnet, 20 questions with 5 passages each cost a few cents. Prompts are versioned (`generation/prompts.py`) and the version is stored in every run, so bump it when you change a prompt.
 
 Answer runs go in `data/runs/` next to retrieval runs (`report.md` lists every answer that wasn't fully correct, with the judge's reasons), and `compare` works on them too.
 
@@ -114,7 +114,7 @@ A generator gets the question and the `Library` (see `library.py`) and returns a
 ```python
 class MyGenerator(Generator):
     name = "mine"
-    def answer(self, question, library, k=8, retriever="bm25", on_step=None) -> Answer:
+    def answer(self, question, library, k=5, retriever="bm25", on_step=None) -> Answer:
         trace = Trace(on_step)
         hits = library.search(question, k=k, retriever=retriever)
         trace.saw(hits)                                   # passages it may cite

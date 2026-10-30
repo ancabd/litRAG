@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from generation.answer import Generator
+from generation.llm import DEFAULT_K
 from library import Library
 from retrieval import slug
 
@@ -78,7 +79,7 @@ def _passage(c: dict) -> dict:
 
 
 def run_answer_eval(questions_path: Path, chunks_path: Path, generator: Generator, judge: Judge | None,
-                    retriever_name: str = "bm25", split: str | None = "dev", k: int = 8,
+                    retriever_name: str = "bm25", split: str | None = "dev", k: int = DEFAULT_K,
                     out_root: Path | None = None, name: str | None = None, progress=None,
                     threshold: float = 0.5) -> Path:
     t0 = time.perf_counter()

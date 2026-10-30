@@ -59,8 +59,8 @@ function RunEvalPanel() {
   const [split, setSplit] = useState<"dev" | "test" | "all">("dev");
   const [generator, setGenerator] = useState<"claude" | "agent" | "extractive">("claude");
   const [model, setModel] = useState("");
-  const [judge, setJudge] = useState("same");
-  const [k, setK] = useState(8);
+  const [judge, setJudge] = useState("default");
+  const [k, setK] = useState(5);
   const [jobId, setJobId] = useState<string | null>(null);
   const chosen = chunks || run || "";
   const items = questions.data?.items ?? [];
@@ -69,7 +69,7 @@ function RunEvalPanel() {
   const models = llm.data?.models ?? [];
   const genModel = model || llm.data?.default_model || "";
   const usesModel = generator !== "extractive";
-  const judgeModel = judge === "same" ? (usesModel ? genModel : llm.data?.default_model ?? "") : judge;
+  const judgeModel = judge === "default" ? llm.data?.judge_model ?? "claude-sonnet-5-5" : judge;
   const needsKey = kind === "answer" && !llm.data?.configured && (usesModel || judgeModel !== "none");
 
   const finished = useCallback(
@@ -171,8 +171,8 @@ function RunEvalPanel() {
           <label className="inline-field">
             <span>Judge</span>
             <select className="select" value={judge} onChange={(e) => setJudge(e.target.value)}>
-              <option value="same">{usesModel ? `Same model (${genModel})` : `Default (${llm.data?.default_model ?? ""})`}</option>
-              {models.map((m) => (
+              <option value="default">{llm.data?.judge_model ?? "claude-sonnet-5-5"} (default, for every run)</option>
+              {models.filter((m) => m !== llm.data?.judge_model).map((m) => (
                 <option key={m} value={m}>
                   {m}
                 </option>

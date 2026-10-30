@@ -93,7 +93,9 @@ def test_answer_eval_job_verdicts_and_agreement(client, scripted, data_dir):
 
 
 def test_answer_eval_extractive_no_judge_and_errors(client, monkeypatch):
-    r = client.post("/api/evals", json={"kind": "answer", "generator": "extractive"})
+    # the judge defaults to Sonnet for every generator, which needs a key; without one, ask for no judge
+    assert client.post("/api/evals", json={"kind": "answer", "generator": "extractive"}).status_code == 503
+    r = client.post("/api/evals", json={"kind": "answer", "generator": "extractive", "judge": "none"})
     job = wait(client, r.json()["job"]["id"])
     assert job["state"] == "done"
     run = client.get(f"/api/evals/{job['result']['name']}").json()

@@ -28,7 +28,7 @@ import time
 from typing import TYPE_CHECKING
 
 from .answer import Generator, Trace, finish_answer
-from .llm import LLM, LLMResponse
+from .llm import DEFAULT_K, LLM, LLMResponse
 from .prompts import AGENT_FINAL_TURN, AGENT_VERSION, agent_system
 from .tools import GIVE_UP_TOOL, TOOLS, ToolContext, ToolResult
 
@@ -70,7 +70,7 @@ class AgentGenerator(Generator):
         return {"name": self.name, **self.llm.config(), "prompt": AGENT_VERSION, "tools": list(self.tools),
                 "max_turns": self.max_turns, "token_budget": self.token_budget}
 
-    def answer(self, question: str, library: "Library", k: int = 8, retriever: str = "bm25", on_step=None):
+    def answer(self, question: str, library: "Library", k: int = DEFAULT_K, retriever: str = "bm25", on_step=None):
         trace = Trace(on_step)
         ctx = ToolContext(library, retriever=retriever, k=k)
         all_tools = [TOOLS[n].spec(ctx) for n in self.tools] + [GIVE_UP_TOOL]

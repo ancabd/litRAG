@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..core import DEFAULT_MODEL, PRICES, LLMNotConfigured, available_generators, get_generator, keys
+from ..core import DEFAULT_K, DEFAULT_MODEL, JUDGE_MODEL, PRICES, LLMNotConfigured, available_generators, get_generator, keys
 from .chunks import RunData
 from .evidence import chunk_view
 
@@ -18,6 +18,8 @@ class AnsweringService:
             "key": keys.status(),
             "generators": available_generators(),
             "default_model": DEFAULT_MODEL,
+            "judge_model": JUDGE_MODEL,
+            "default_k": DEFAULT_K,
             "models": list(PRICES),
             "prices": {m: {"input": p[0], "output": p[1]} for m, p in PRICES.items()},
         }

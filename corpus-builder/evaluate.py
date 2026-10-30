@@ -20,7 +20,7 @@ Examples:
   python evaluate.py run --retriever hybrid:bge-small
   python evaluate.py ask "What test system did Behler and Parrinello use?"
   python evaluate.py ask --generator agent "Which cutoff radius does NequIP use, and how does it compare to SchNet?"
-  python evaluate.py answer                         # claude-sonnet-5-5 answers, judged by the same model
+  python evaluate.py answer                         # claude-sonnet-5-5 answers, judged by claude-sonnet-5-5
   python evaluate.py answer --generator extractive --judge none     # no API key needed
   python evaluate.py answer --generator agent --model claude-haiku-5-5 --judge claude-sonnet-5-5
   python evaluate.py compare data/runs/A data/runs/B
@@ -292,11 +292,11 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--name", default=None, help="run folder name (default: timestamp + config)")
 
     from generation.answer import available_generators
-    from generation.llm import DEFAULT_MODEL
+    from generation.llm import DEFAULT_K, DEFAULT_MODEL, JUDGE_MODEL
 
     def gen_args(p):
         p.add_argument("--retriever", default="bm25", type=retriever_name, help="bm25, dense:bge-small or hybrid:bge-small")
-        p.add_argument("-k", type=int, default=8, help="passages per search (default: 8)")
+        p.add_argument("-k", type=int, default=DEFAULT_K, help=f"passages per search (default: {DEFAULT_K})")
         p.add_argument("--generator", default="claude", choices=available_generators())
         p.add_argument("--model", default=DEFAULT_MODEL, help=f"generator model (default: {DEFAULT_MODEL})")
         p.add_argument("--no-cache", action="store_true", help="always call the model (default: reuse cached responses)")
@@ -314,7 +314,7 @@ def main(argv: list[str] | None = None) -> int:
     an = sub.add_parser("answer", help="answer eval: generate and judge answers")
     common(an)
     gen_args(an)
-    an.add_argument("--judge", default=DEFAULT_MODEL, help=f"judge model, or 'none' (default: {DEFAULT_MODEL})")
+    an.add_argument("--judge", default=JUDGE_MODEL, help=f"judge model, or 'none' (default: {JUDGE_MODEL}, whatever generates)")
     an.add_argument("--split", default="dev", choices=["dev", "test", "all"])
     an.add_argument("--out", type=Path, default=paths.RUNS)
     an.add_argument("--name", default=None)

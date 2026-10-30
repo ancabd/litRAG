@@ -29,7 +29,9 @@ PRICES = {
     "claude-sonnet-5-5": (2.0, 10.0),
     "claude-haiku-5-5": (0.10, 0.50),
 }
-DEFAULT_MODEL = "claude-sonnet-5-5"
+DEFAULT_MODEL = "claude-sonnet-5-5"   # generator
+JUDGE_MODEL = "claude-sonnet-5-5"     # judge: fixed by default, so every run is graded by the same model
+DEFAULT_K = 5                         # passages per search, everywhere (CLI, app, evals, agent)
 # Prompt caching (chat(..., cache=True)): writes cost 1.25x the input price (5-minute cache), reads a
 # fraction of it, per the prompt caching docs. Haiku's prices for prompts over 100K tokens are ignored.
 CACHE_WRITE = 1.25
