@@ -12,7 +12,7 @@ from evaluation.answer_runner import run_answer_eval  # noqa: E402
 from generation import answer as answer_module  # noqa: E402
 from generation.agent import AgentGenerator  # noqa: E402
 from generation.llm import CachedLLM, LLMResponse, ScriptedLLM, ToolCall  # noqa: E402
-from generation.prompts import AGENT_FINAL_TURN, AGENT_VERSION  # noqa: E402
+from generation.prompts import AGENT_FINAL_TURN, AGENT_VERSION, agent_system  # noqa: E402
 from library import Library  # noqa: E402
 
 
@@ -300,3 +300,25 @@ def test_answer_eval_records_effort(tmp_path):
     assert summary["effort"]["turns"] == 3 and summary["effort"]["total_cost"] > 0
     assert "## Effort per question" in (run_dir / "report.md").read_text()
     assert 'steps: search "NequIP radial cutoff"' in (run_dir / "report.md").read_text()
+
+
+def test_give_up_with_cited_reason_counts_as_declining():
+    """The agent can decline while saying what the papers do cover; its citations are checked like an answer's."""
+    def respond(system, messages, tools):
+        if not tool_results(messages):
+            return {"tool_calls": [{"name": "search", "input": {"query": "NequIP training cost"}}]}
+        return {"tool_calls": [{"name": "give_up", "input": {
+            "reason": "The passages describe NequIP's convolutions [NQ#000] but give no training cost; see also [XX#999]."}}]}
+
+    ans = AgentGenerator(ScriptedLLM(chat_respond=respond)).answer("How long does NequIP take to train?", lib())
+    assert not ans.answerable and ans.citations == ["NQ#000"] and ans.invalid_citations == ["XX#999"]
+    assert ans.trace[-1]["action"] == "give_up" and "[NQ#000]" in ans.answer
+
+
+def test_prompts_steer_declines_to_give_up():
+    from generation.prompts import ANSWER_SYSTEM
+    from generation.tools import GIVE_UP_TOOL
+    system = agent_system("bm25")
+    assert "Never write \"the papers don't say ...\" as a plain reply" in system and "only way to decline" in system
+    assert "[passage-id]" in GIVE_UP_TOOL["input_schema"]["properties"]["reason"]["description"]
+    assert '"answerable" stays false' in ANSWER_SYSTEM

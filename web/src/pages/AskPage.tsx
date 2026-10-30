@@ -141,7 +141,8 @@ export function AskPage() {
             </div>
           ) : (
             <div className="not-found">
-              <strong>Not found in the corpus.</strong> <span className="prose">{r.answer}</span>
+              <strong>Not found in the corpus.</strong>{" "}
+              <span className="prose"><AnswerText text={r.answer} citations={r.citations} /></span>
             </div>
           )}
           {r.warnings.length > 0 && (

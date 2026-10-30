@@ -82,7 +82,7 @@ def test_llm_generator_validates_citations():
     system, prompt = llm.calls[0]
     assert "Use only information stated in the passages" in system
     assert "[BP#000] Behler (2020) - S, p. 1" in prompt and "Question: What test system demonstrated" in prompt
-    assert ans.prompt_version == "answer-v1" and ans.passages[0]["chunk_id"] == "BP#000"
+    assert ans.prompt_version == "answer-v2" and ans.passages[0]["chunk_id"] == "BP#000"
 
 
 def test_llm_generator_abstains_and_survives_bad_json():

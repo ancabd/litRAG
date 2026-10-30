@@ -175,8 +175,16 @@ class OpenPaper(Tool):
 
 GIVE_UP_TOOL = {
     "name": "give_up",
-    "description": "Say that the papers do not answer the question, and why. Ends your work.",
-    "input_schema": {"type": "object", "properties": {"reason": {"type": "string"}}, "required": ["reason"]},
+    "description": ("Decline: the papers do not answer the question. Use it whenever you can't answer, including when "
+                    "you found related passages; say in the reason what they do and don't cover, citing them as "
+                    "[passage-id]. Ends your work."),
+    "input_schema": {
+        "type": "object",
+        "properties": {"reason": {"type": "string", "description": (
+            "What the papers do and don't say about the question, citing passages you read as [passage-id], "
+            "e.g. 'The passages describe NequIP's architecture [W1#003] but give no training cost.'")}},
+        "required": ["reason"],
+    },
 }
 
 TOOLS: dict[str, Tool] = {t.name: t for t in (Search(), ReadAround(), OpenPaper())}

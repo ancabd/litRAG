@@ -14,6 +14,7 @@ env/
 # Secrets and local settings (ANTHROPIC_API_KEY, S2_API_KEY, ...)
 .env
 .env.*
+.litrag/*
 
 # Editors and OS
 .vscode/

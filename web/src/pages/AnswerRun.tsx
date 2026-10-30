@@ -90,7 +90,7 @@ function Row({ run, q }: { run: string; q: EvalQuestion }) {
               {a.answerable ? (
                 <p className="prose"><AnswerText text={a.answer} citations={a.citations} anchorPrefix={prefix} /></p>
               ) : (
-                <p className="prose not-found"><strong>Declined.</strong> {a.answer}</p>
+                <p className="prose not-found"><strong>Declined.</strong> <AnswerText text={a.answer} citations={a.citations} anchorPrefix={prefix} /></p>
               )}
               {a.invalid_citations.length > 0 && (
                 <p className="xs disagree">Cites passages it wasn't given: {a.invalid_citations.join(", ")}</p>
