@@ -1713,3 +1713,126 @@ a.tp:hover {
 .trace-legend .tp {
   pointer-events: none;
 }
+
+/* ---------------------------------------------------------------- building a corpus */
+.corpus-start {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.corpus-card {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  padding: 18px 20px;
+}
+.corpus-card h2 {
+  margin: 0 0 4px;
+  font-size: var(--fs-lg);
+}
+.corpus-card > p {
+  margin: 0 0 16px;
+}
+.corpus-card .textarea {
+  font-size: var(--fs-sm);
+}
+.corpus-card .input.narrow {
+  width: 110px;
+}
+.corpus-card .fields-row .field {
+  margin-bottom: 10px;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+.upload-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  max-height: 260px;
+  overflow-y: auto;
+}
+.upload-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--rule);
+  font-size: var(--fs-sm);
+}
+.upload-list li:last-child {
+  border-bottom: 0;
+}
+.upload-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.upload-note {
+  margin-left: auto;
+  color: var(--ink-3);
+  text-align: right;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.upload-added .upload-note {
+  color: var(--ok);
+}
+.upload-failed .upload-note {
+  color: var(--danger);
+  white-space: normal;
+}
+.corpus-job {
+  position: relative;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.corpus-job-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.corpus-job .job-bar {
+  margin-bottom: 6px;
+}
+.corpus-done p {
+  margin: 0 0 8px;
+  padding-right: 28px;
+}
+.corpus-log {
+  margin-top: 10px;
+}
+.corpus-log pre {
+  margin: 6px 0 0;
+  max-height: 320px;
+  overflow: auto;
+  font-size: var(--fs-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.corpus-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+@media (max-width: 720px) {
+  .corpus-start {
+    grid-template-columns: 1fr;
+  }
+}

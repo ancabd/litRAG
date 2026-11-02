@@ -41,7 +41,7 @@ export function ChunkCard({
         <span className="section">{chunk.section}</span>
         <span className="muted">{pages(chunk)}</span>
         <span className="id">{chunk.chunk_id}</span>
-        {chunk.source !== "pdf" && <span className="pill">from abstract</span>}
+        {chunk.source !== "pdf" && chunk.source !== "document" && <span className="pill">from abstract</span>}
         {chunk.coverage !== undefined && (
           <span className="muted xs">{Math.round(chunk.coverage * 100)}% of quote</span>
         )}

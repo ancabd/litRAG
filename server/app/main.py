@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import Settings
 from .core import RetrieverUnavailable
 from .deps import Services
-from .routers import ask, evals, indexes, meta, papers, questions, search
+from .routers import ask, building, evals, indexes, meta, papers, questions, search
 
 API_PREFIX = "/api"
 
@@ -27,7 +27,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # the Vite dev server runs on another port during development
     app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
                        allow_methods=["*"], allow_headers=["*"])
-    for r in (meta.router, papers.router, questions.router, search.router, evals.router, ask.router, indexes.router):
+    for r in (meta.router, papers.router, questions.router, search.router, evals.router, ask.router, indexes.router, building.router):
         app.include_router(r, prefix=API_PREFIX)
     @app.exception_handler(RetrieverUnavailable)
     def retriever_unavailable(request, exc: RetrieverUnavailable):

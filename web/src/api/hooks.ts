@@ -3,6 +3,10 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, streamPost } from "./client";
 import type {
+  BuildBody,
+  CorpusJob,
+  CorpusOverview,
+  PaperSummary,
   AskEvent,
   AskResult,
   TraceStep,
@@ -365,4 +369,61 @@ export function useAskStream() {
     [run],
   );
   return { ask, steps, pending, error };
+}
+
+// ------------------------------------------------------------------ building a corpus
+
+/** Corpus size, and the build/re-index job if one is running (polled while it runs). */
+export function useCorpus() {
+  return useQuery({
+    queryKey: ["corpus"],
+    queryFn: () => api.get<CorpusOverview>("/corpus"),
+    refetchInterval: (q) => (q.state.data?.job ? 1500 : false),
+  });
+}
+
+export function useCorpusJob(id: string | null) {
+  return useQuery({
+    queryKey: ["job", id],
+    queryFn: () => api.get<CorpusJob>(`/jobs/${id}`),
+    enabled: !!id,
+    refetchInterval: (q) => (q.state.data?.state === "running" || !q.state.data ? 800 : false),
+  });
+}
+
+export function useBuildCorpus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (b: BuildBody) => api.post<CorpusJob>("/corpus/build", b),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["corpus"] }),
+  });
+}
+
+export function useUploadDocument() {
+  return useMutation({
+    mutationFn: ({ file, title }: { file: File; title?: string }) =>
+      api.post<PaperSummary>("/corpus/documents", file, { filename: file.name, title }),
+  });
+}
+
+export function useReindex() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<CorpusJob>("/corpus/reindex", {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["corpus"] }),
+  });
+}
+
+export function useDeleteDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del<{ document: PaperSummary; job: CorpusJob }>(`/corpus/documents/${encodeURIComponent(id)}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["corpus"] }),
+  });
+}
+
+/** After the corpus changed underneath the app: refetch everything. */
+export function useEverythingChanged() {
+  const qc = useQueryClient();
+  return useCallback(() => qc.invalidateQueries(), [qc]);
 }

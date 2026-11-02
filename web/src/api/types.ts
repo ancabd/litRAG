@@ -1,6 +1,6 @@
 // Shapes of the server's JSON responses (server/app/routers). Keep in sync with the API.
 
-export type PaperStatus = "pdf" | "abstract_only" | "metadata_only" | "not_downloaded" | string;
+export type PaperStatus = "pdf" | "abstract_only" | "metadata_only" | "not_downloaded" | "document" | string;
 export type QuestionType = "lookup" | "multihop" | "comparison" | "unanswerable";
 export type Split = "dev" | "test";
 export type EvidenceStatus = "ok" | "paper_missing" | "no_quote" | "not_found";
@@ -27,6 +27,7 @@ export interface PaperSummary {
   cited_by_count: number | null;
   n_chunks?: number;
   added_manually: string[]; // "pdf" and/or "abstract"
+  source_file?: string | null; // uploaded documents: the original file name
 }
 
 export interface Meta {
@@ -408,4 +409,34 @@ export interface IndexStatus {
   run: string;
   installed: boolean;
   models: EmbeddingIndex[];
+}
+
+// ------------------------------------------------------------------ building a corpus
+
+export interface CorpusJob extends Omit<Job, "meta" | "result"> {
+  meta: { action: "build" | "reindex"; phase: "collect" | "parse"; log: string[] };
+  result: {
+    papers?: number;
+    by_status?: Record<string, number>;
+    runs: { run: string; chunks?: number; papers?: number; failures?: Record<string, string> }[];
+  } | null;
+}
+
+export interface CorpusOverview {
+  papers: number;
+  documents: number;
+  seeds: number;
+  runs: string[];
+  job: CorpusJob | null;
+  openalex_key: boolean;
+  suffixes: string[];
+  max_bytes: number;
+}
+
+export interface BuildBody {
+  seeds: string;
+  max_citing: number;
+  recent_citing: number;
+  download: boolean;
+  openalex_key?: string;
 }

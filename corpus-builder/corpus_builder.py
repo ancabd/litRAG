@@ -39,6 +39,7 @@ from urllib.parse import urlparse
 import requests
 
 import paths
+from logsink import log
 
 OPENALEX = "https://api.openalex.org"
 S2 = "https://api.semanticscholar.org/graph/v1/paper"
@@ -61,10 +62,6 @@ DEFAULT_INTERVAL = 1.0
 
 
 # --------------------------------------------------------------------------- helpers
-
-def log(msg: str) -> None:
-    print(msg, file=sys.stderr, flush=True)
-
 
 def short_id(openalex_id: str) -> str:
     """'https://openalex.org/W123' -> 'W123'."""
@@ -593,12 +590,87 @@ def set_manual_abstract(out: Path, paper_id: str, abstract: str | None) -> dict:
     return _edit_paper(out, paper_id, change)
 
 
+# --------------------------------------------------------------------------- uploaded documents
+#
+# Any document can join the corpus, not only papers: notes, manuals, web pages, reports.
+# Each gets an id D0001, D0002, ... and a manifest row with status "document" and role
+# "document"; the file itself is kept in <corpus>/documents/. build() keeps these rows, so
+# building from seeds later adds papers next to your documents instead of replacing them.
+
+DOCUMENTS_DIR = "documents"
+DOCUMENT_ROLE = "document"
+DOCUMENT_ID = re.compile(r"^D\d+$")
+DOCUMENT_SUFFIXES = (".pdf", ".txt", ".text", ".md", ".markdown", ".rst", ".html", ".htm", ".docx")
+
+
+def is_document(row: dict) -> bool:
+    return DOCUMENT_ROLE in (row.get("roles") or [])
+
+
+def _rows_or_empty(out: Path) -> list[dict]:
+    return load_manifest_rows(out) if (out / "manifest.jsonl").exists() else []
+
+
+def add_document(out: Path, filename: str, data: bytes, title: str | None = None) -> dict:
+    """Add one uploaded file to the corpus; returns its manifest row. Parse it with ingest.pipeline."""
+    from ingest.parsers.text_parser import guess_title  # here: keeps this module importable alone
+
+    out = Path(out)
+    suffix = Path(filename or "").suffix.lower()
+    if suffix not in DOCUMENT_SUFFIXES:
+        raise ManualEditError(f"Can't read {suffix or 'files without an extension'} files. "
+                              f"Supported: {', '.join(DOCUMENT_SUFFIXES)}.")
+    if not data:
+        raise ManualEditError(f"{filename} is empty.")
+    if len(data) > MAX_PDF_BYTES:
+        raise ManualEditError(f"{filename} is larger than {MAX_PDF_BYTES // 2**20} MB.")
+    if suffix == ".pdf" and not data.startswith(b"%PDF"):
+        raise ManualEditError(f"{filename} isn't a PDF (it doesn't start with %PDF).")
+    if suffix == ".docx" and not data.startswith(b"PK"):
+        raise ManualEditError(f"{filename} isn't a Word .docx file (old .doc files aren't supported).")
+    out.mkdir(parents=True, exist_ok=True)
+    rows = _rows_or_empty(out)
+    taken = [int(r["openalex_id"][1:]) for r in rows if DOCUMENT_ID.match(str(r.get("openalex_id")))]
+    doc_id = f"D{(max(taken) + 1) if taken else 1:04d}"
+    folder = out / DOCUMENTS_DIR
+    folder.mkdir(exist_ok=True)
+    path = folder / f"{doc_id}{suffix}"
+    tmp = path.with_name(path.name + ".part")
+    tmp.write_bytes(data)
+    tmp.replace(path)
+    digest = hashlib.sha256(data).hexdigest()[:16]
+    row = asdict(Paper(openalex_id=doc_id, title=(title or "").strip() or guess_title(path, filename),
+                       doi=None, year=None, type="document", authors=None, venue=None,
+                       cited_by_count=None, is_oa=None, roles=[DOCUMENT_ROLE]))
+    row.update(status="document", pdf_path=str(path.relative_to(out)) if suffix == ".pdf" else None,
+               doc_path=str(path.relative_to(out)), source_file=Path(filename).name, sha256=digest,
+               note="uploaded " + datetime.now(timezone.utc).date().isoformat())
+    write_manifest_rows(rows + [row], out)
+    return row
+
+
+def remove_document(out: Path, doc_id: str) -> dict:
+    out = Path(out)
+    rows = _rows_or_empty(out)
+    row = next((r for r in rows if r["openalex_id"] == doc_id), None)
+    if row is None or not is_document(row):
+        raise ManualEditError(f"No uploaded document {doc_id} in the corpus.")
+    if row.get("doc_path"):
+        path = (out / row["doc_path"]).resolve()
+        if (out / DOCUMENTS_DIR).resolve() in path.parents:
+            path.unlink(missing_ok=True)
+    write_manifest_rows([r for r in rows if r["openalex_id"] != doc_id], out)
+    return row
+
+
 # --------------------------------------------------------------------------- main build
 
 def build(seed_lines: list[str], out: Path, *, api_key: str | None = None, max_citing: int = 50,
           recent_citing: int = 0, download: bool = True, use_s2: bool = True,
           min_title_score: float = 0.85, s2_api_key: str | None = None, session=None,
-          throttle: Throttle | None = None, sleep: Callable[[float], None] = time.sleep) -> list[Paper]:
+          throttle: Throttle | None = None, sleep: Callable[[float], None] = time.sleep,
+          progress: Callable[[int, int], None] | None = None) -> list[Paper]:
+    """progress(done, total), if given, is called as each paper's full text is fetched."""
     out = out.resolve()  # relative paths depend on the terminal's folder; always report the full path
     out.mkdir(parents=True, exist_ok=True)
     log(f"Output folder: {out}")
@@ -659,6 +731,8 @@ def build(seed_lines: list[str], out: Path, *, api_key: str | None = None, max_c
         + ("Fetching full texts..." if download else "Skipping downloads (--no-download)."))
 
     for i, p in enumerate(papers, 1):
+        if progress:
+            progress(i, len(papers))
         pdf = out / "pdfs" / f"{p.openalex_id}.pdf"
         stale_abstract = out / "abstracts" / f"{p.openalex_id}.md"
         if pdf.exists() and pdf.read_bytes()[:4] == b"%PDF":
@@ -686,7 +760,10 @@ def build(seed_lines: list[str], out: Path, *, api_key: str | None = None, max_c
         if download:
             log(f"  [{i}/{len(papers)}] {'ABSTR' if p.abstract else 'META '} {p.title}")
 
-    write_manifest(papers, out)
+    documents = [r for r in _rows_or_empty(out) if is_document(r)]
+    if documents:
+        log(f"Keeping {len(documents)} uploaded document(s)")
+    write_manifest_rows([asdict(p) for p in papers] + documents, out)
     counts: dict[str, int] = {}
     for p in papers:
         counts[p.status] = counts.get(p.status, 0) + 1

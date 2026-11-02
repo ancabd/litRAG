@@ -38,7 +38,8 @@ class JobManager:
 
     def start(self, kind: str, fn, *args, meta: dict | None = None, **kwargs) -> Job:
         """Run fn(*args, progress=callback, **kwargs) in a thread. fn returns a dict (the job result)."""
-        job = Job(id=uuid.uuid4().hex[:12], kind=kind, meta=dict(meta or {}))
+        # meta is kept as given (not copied), so the job function can update it as it runs
+        job = Job(id=uuid.uuid4().hex[:12], kind=kind, meta=meta if meta is not None else {})
         with self._lock:
             self._jobs[job.id] = job
             for old in sorted(self._jobs.values(), key=lambda j: j.started)[:-self.keep]:

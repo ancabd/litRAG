@@ -7,7 +7,7 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 
-PAPER_ID = re.compile(r"^W\d+$")
+PAPER_ID = re.compile(r"^[WD]\d+$")  # W: OpenAlex works; D: uploaded documents
 
 
 @dataclass
@@ -56,10 +56,17 @@ class CorpusService:
         if not p or not p.get("pdf_path"):
             return None
         path = (self.corpus_dir / p["pdf_path"]).resolve()
-        pdfs = (self.corpus_dir / "pdfs").resolve()
-        if pdfs not in path.parents or not path.is_file():
+        allowed = [(self.corpus_dir / d).resolve() for d in ("pdfs", "documents")]
+        if not any(d in path.parents for d in allowed) or not path.is_file():
             return None
         return path
+
+    def overview(self) -> dict:
+        """How big the corpus is: papers from OpenAlex and uploaded documents."""
+        rows = self.all()
+        docs = [p for p in rows if "document" in (p.get("roles") or [])]
+        return {"papers": len(rows) - len(docs), "documents": len(docs),
+                "seeds": sum(1 for p in rows if "seed" in (p.get("roles") or []))}
 
     def query(self, q: str = "", status: str | None = None, role: str | None = None, seed: str | None = None,
               sort: str = "cited", chunk_counts: dict[str, int] | None = None,
@@ -104,7 +111,7 @@ class CorpusService:
 
 def summary(p: dict, n_chunks: int | None = None) -> dict:
     out = {k: p.get(k) for k in ("openalex_id", "title", "authors", "year", "venue", "doi", "status",
-                                 "roles", "via_seeds", "cited_by_count")}
+                                 "roles", "via_seeds", "cited_by_count", "source_file")}
     out["added_manually"] = p.get("added_manually") or []
     if n_chunks is not None:
         out["n_chunks"] = n_chunks
@@ -123,6 +130,52 @@ class ManualEditor:
     def __init__(self, corpus_dir: Path, chunks_root: Path, chunk_service):
         self.corpus_dir, self.chunks_root, self.chunks = corpus_dir, chunks_root, chunk_service
         self._lock = threading.Lock()
+
+    # ---- whole-corpus changes: uploaded documents and building from seeds (run as jobs)
+
+    def _reindex(self, progress=None) -> list[dict]:
+        from ..core import rebuild_runs
+        runs = rebuild_runs(self.corpus_dir, self.chunks_root, create_default=True, progress=progress)
+        self.chunks.invalidate()
+        return runs
+
+    def add_document(self, filename: str, data: bytes, title: str | None = None) -> dict:
+        """Store one uploaded file in the manifest. Call reindex() afterwards (once for many files)."""
+        from ..core import add_document
+        with self._lock:
+            return add_document(self.corpus_dir, filename, data, title)
+
+    def remove_document(self, doc_id: str) -> dict:
+        from ..core import remove_document
+        with self._lock:
+            return remove_document(self.corpus_dir, doc_id)
+
+    def reindex(self, progress=None, log=None) -> dict:
+        """Parse new files and re-chunk every chunk run (creating the first run for a new corpus)."""
+        from ..core import capture_log
+        with self._lock, capture_log(log or (lambda line: None)):
+            runs = self._reindex(progress)
+        return {"runs": [{"run": r["run"], "chunks": r.get("chunks"), "papers": r.get("papers"),
+                          "failures": r.get("failures") or {}} for r in runs]}
+
+    def build_from_seeds(self, seed_lines: list[str], *, max_citing: int, recent_citing: int, download: bool,
+                         openalex_key: str | None, progress=None, log=None, phase=None) -> dict:
+        """Collect papers around the seeds from OpenAlex, fetch full texts, then parse and chunk them."""
+        from ..core import build_corpus, capture_log
+        phase = phase or (lambda name: None)
+        with self._lock, capture_log(log or (lambda line: None)):
+            phase("collect")
+            papers = build_corpus(seed_lines, self.corpus_dir, api_key=openalex_key, max_citing=max_citing,
+                                  recent_citing=recent_citing, download=download, progress=progress)
+            if not papers:
+                raise ValueError("None of the seeds were found in OpenAlex; nothing was added.")
+            phase("parse")
+            runs = self._reindex(progress)
+        counts: dict[str, int] = {}
+        for p in papers:
+            counts[p.status] = counts.get(p.status, 0) + 1
+        return {"papers": len(papers), "by_status": counts,
+                "runs": [{"run": r["run"], "chunks": r.get("chunks")} for r in runs]}
 
     def _apply(self, edit, paper_id: str) -> dict:
         from ..core import paper_report, rebuild_runs  # imported here: heavy, only needed for edits

@@ -24,10 +24,14 @@ from pathlib import Path
 from .chunking import ChunkConfig, chunk_document
 from .documents import Paragraph, ParsedDocument, ParseError, Section
 from .parsers import get_parser
+from .parsers.text_parser import TextParser
 
 
-def log(msg: str) -> None:
-    print(msg, file=sys.stderr, flush=True)
+try:
+    from logsink import log  # shared with corpus_builder, so the web app can show progress
+except ImportError:  # pragma: no cover - ingest used on its own
+    def log(msg: str) -> None:
+        print(msg, file=sys.stderr, flush=True)
 
 
 # ------------------------------------------------------------------ worker side
@@ -61,7 +65,7 @@ class PaperReport:
     paper_id: str
     title: str | None
     status: str                 # manifest status
-    source: str = "skipped"     # pdf / abstract / abstract_fallback / skipped
+    source: str = "skipped"     # pdf / document / abstract / abstract_fallback / skipped
     n_pages: int | None = None
     n_sections: int = 0
     n_words: int = 0
@@ -87,13 +91,17 @@ def load_manifest(corpus: Path) -> list[dict]:
 
 def run(corpus: Path, out: Path, parser_name: str = "pymupdf", cfg: ChunkConfig = ChunkConfig(),
         workers: int | None = None, force: bool = False, only: set[str] | None = None,
-        limit: int | None = None, parser_options: dict | None = None, run_name: str | None = None) -> Path:
+        limit: int | None = None, parser_options: dict | None = None, run_name: str | None = None,
+        progress=None) -> Path:
+    """progress(done, total), if given, is called as files are parsed."""
     t_start = time.perf_counter()
     corpus = corpus.resolve()
     parser_options = parser_options or {}
     parser = get_parser(parser_name, **parser_options)  # validates the name early
     cache_dir = corpus / "parsed" / parser.cache_key
     cache_dir.mkdir(parents=True, exist_ok=True)
+    text_parser = TextParser()
+    text_cache = corpus / "parsed" / text_parser.cache_key
     run_dir = (out / (run_name or f"{parser.name}_{cfg.name}")).resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -104,31 +112,59 @@ def run(corpus: Path, out: Path, parser_name: str = "pymupdf", cfg: ChunkConfig 
         papers = papers[:limit]
     reports = {p["openalex_id"]: PaperReport(p["openalex_id"], p.get("title"), p.get("status")) for p in papers}
 
-    # 1. parse PDFs that are not cached yet
-    todo = []
+    # 1. parse full texts that are not cached yet: PDFs with the chosen parser, other uploaded
+    #    documents (text, Markdown, HTML, Word) with the text parser
+    def source_file(p: dict) -> Path | None:
+        rel = p.get("pdf_path") if p.get("status") == "pdf" else p.get("doc_path") if p.get("status") == "document" else None
+        return corpus / rel if rel else None
+
+    def cache_of(p: dict) -> Path:
+        path = source_file(p)
+        uses_text = path is not None and path.suffix.lower() != ".pdf"
+        return (text_cache if uses_text else cache_dir) / f"{p['openalex_id']}.json"
+
+    todo, text_todo = [], []
     for p in papers:
-        if p.get("status") != "pdf" or not p.get("pdf_path"):
+        path = source_file(p)
+        if path is None:
             continue
-        pdf = corpus / p["pdf_path"]
-        cache = cache_dir / f"{p['openalex_id']}.json"
-        if not pdf.exists():
-            reports[p["openalex_id"]].error = f"PDF missing: {pdf}"
+        cache = cache_of(p)
+        if not path.exists():
+            reports[p["openalex_id"]].error = f"File missing: {path}"
             continue
-        if cache.exists() and not force and cache.stat().st_mtime >= pdf.stat().st_mtime:
+        if cache.exists() and not force and cache.stat().st_mtime >= path.stat().st_mtime:
             reports[p["openalex_id"]].cached = True
             continue
-        todo.append((str(pdf), p["openalex_id"], str(cache)))
+        (todo if path.suffix.lower() == ".pdf" else text_todo).append((str(path), p["openalex_id"], str(cache)))
 
-    n_pdf = sum(1 for p in papers if p.get("status") == "pdf")
+    n_full = sum(1 for p in papers if source_file(p) is not None)
+    n_todo = len(todo) + len(text_todo)
     log(f"Corpus: {corpus}\nParser: {parser.cache_key}   chunks: {cfg}\n"
-        f"{n_pdf} PDFs ({n_pdf - len(todo)} cached, {len(todo)} to parse)")
+        f"{n_full} full texts ({n_full - n_todo} cached, {n_todo} to parse)")
+    if progress:
+        progress(0, n_todo)
+    parsed = 0
+
     def record(done: int, pid: str, err: str | None, secs: float) -> None:
+        nonlocal parsed
+        parsed += 1
         reports[pid].parse_seconds = round(secs, 2)
         reports[pid].error = err
         if err:
-            log(f"  [{done}/{len(todo)}] FAILED {pid}: {err}")
-        elif done % 10 == 0 or done == len(todo):
-            log(f"  [{done}/{len(todo)}] parsed")
+            log(f"  [{parsed}/{n_todo}] FAILED {pid}: {err}")
+        elif parsed % 10 == 0 or parsed == n_todo:
+            log(f"  [{parsed}/{n_todo}] parsed")
+        if progress:
+            progress(parsed, n_todo)
+
+    for path, pid, cache in text_todo:
+        t0 = time.perf_counter()
+        try:
+            text_parser.parse(Path(path), pid).save(Path(cache))
+            record(0, pid, None, time.perf_counter() - t0)
+        except Exception as exc:  # noqa: BLE001
+            record(0, pid, str(exc) if isinstance(exc, ParseError) else f"{type(exc).__name__}: {exc}",
+                   time.perf_counter() - t0)
 
     if todo and (workers == 0 or len(todo) == 1):
         # in-process: no worker start-up cost, and safe to call from inside a web server
@@ -149,9 +185,9 @@ def run(corpus: Path, out: Path, parser_name: str = "pymupdf", cfg: ChunkConfig 
         for p in papers:
             pid, rep = p["openalex_id"], reports[p["openalex_id"]]
             doc, source = None, None
-            cache = cache_dir / f"{pid}.json"
-            if p.get("status") == "pdf" and cache.exists() and not rep.error:
-                doc, source = ParsedDocument.load(cache), "pdf"
+            cache = cache_of(p)
+            if source_file(p) is not None and cache.exists() and not rep.error:
+                doc, source = ParsedDocument.load(cache), p["status"]
             elif p.get("abstract"):
                 doc = abstract_document(pid, p["abstract"])
                 source = "abstract_fallback" if p.get("status") == "pdf" else "abstract"
@@ -196,14 +232,15 @@ def run(corpus: Path, out: Path, parser_name: str = "pymupdf", cfg: ChunkConfig 
     (run_dir / "run.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     log(f"\nDone in {summary['seconds']}s: {n_chunks} chunks from "
-        + ", ".join(f"{v} {k}" for k, v in sorted(by_source.items())) + " papers")
+        + ", ".join(f"{v} {k}" for k, v in sorted(by_source.items())))
     if failures:
-        log(f"{len(failures)} PDF(s) failed to parse (abstract used where available); see papers.csv")
+        log(f"{len(failures)} file(s) failed to parse (abstract used where available); see papers.csv")
     log(f"Output: {run_dir}")
     return run_dir
 
 
-def rebuild_runs(corpus: Path, chunks_root: Path, workers: int | None = 0) -> list[dict]:
+def rebuild_runs(corpus: Path, chunks_root: Path, workers: int | None = 0, create_default: bool = False,
+                 progress=None) -> list[dict]:
     """Re-chunk every existing run under chunks_root with that run's own parser and chunk settings.
 
     Used after the corpus changes (e.g. a manually added PDF). Parsed documents are cached,
@@ -211,9 +248,13 @@ def rebuild_runs(corpus: Path, chunks_root: Path, workers: int | None = 0) -> li
     Returns one summary (run.json contents) per run.
     """
     results = []
-    if not Path(chunks_root).exists():
-        return results
-    for run_dir in sorted(Path(chunks_root).iterdir()):
+    chunks_root = Path(chunks_root)
+    run_dirs = sorted(d for d in chunks_root.iterdir() if (d / "chunks.jsonl").exists()) if chunks_root.exists() else []
+    if not run_dirs and create_default:
+        # a new corpus: make the standard run, so the corpus is searchable straight away
+        out = run(corpus, chunks_root, "pymupdf", ChunkConfig(), workers=workers, progress=progress)
+        return [{"run": out.name, **json.loads((out / "run.json").read_text(encoding="utf-8"))}]
+    for run_dir in run_dirs:
         info_path = run_dir / "run.json"
         if not (run_dir / "chunks.jsonl").exists() or not info_path.exists():
             continue
@@ -222,7 +263,7 @@ def rebuild_runs(corpus: Path, chunks_root: Path, workers: int | None = 0) -> li
         c = info.get("chunking") or {}
         cfg = ChunkConfig(c.get("size", 400), c.get("overlap", 60), c.get("min_words", 40))
         out = run(corpus, run_dir.parent, parser_name, cfg, workers=workers,
-                  parser_options=info.get("parser_options") or {}, run_name=run_dir.name)
+                  parser_options=info.get("parser_options") or {}, run_name=run_dir.name, progress=progress)
         results.append({"run": run_dir.name, **json.loads((out / "run.json").read_text(encoding="utf-8"))})
     return results
 

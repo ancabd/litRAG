@@ -160,13 +160,14 @@ class OpenPaper(Tool):
         p = ctx.library.paper(pid)
         if p is None:
             return ToolResult(f"No paper with id {pid}.", is_error=True, note=f"unknown paper {pid}")
-        lines = [f"{p['title']} ({p.get('year')}), {p.get('authors') or 'unknown authors'}. Paper id {pid}.",
-                 "Full text available." if p["source"] == "pdf" else "Only the abstract is available."]
+        year = f" ({p['year']})" if p.get('year') else ""
+        lines = [f"{p['title']}{year}, {p.get('authors') or 'unknown authors'}. Paper id {pid}.",
+                 "Full text available." if p["source"] in ("pdf", "document") else "Only the abstract is available."]
         abstract = [c for c in ctx.library.section_chunks(pid, "Abstract")][:1]
         text, new = show(ctx, abstract) if abstract else ("", [])
         if text:
             lines += ["", "Abstract:", text]
-        if p["source"] == "pdf":
+        if p["source"] in ("pdf", "document"):
             lines += ["", "Sections (first passage id, number of passages):"]
             lines += [f"- {s['section']} ({s['first_chunk']}, {s['n_chunks']})" for s in p["sections"]]
         return ToolResult("\n".join(lines), [c["chunk_id"] for c in abstract], new,

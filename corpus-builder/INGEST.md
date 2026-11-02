@@ -14,6 +14,7 @@ python parse_corpus.py run                    # writes data/chunks/pymupdf_w400_
 | `pdf` | the parsed full text; if parsing fails, the abstract (`source: abstract_fallback`) |
 | `abstract_only` | the abstract, as one chunk |
 | `metadata_only` | nothing (logged as `skipped`) |
+| `document` | an uploaded file (`documents/D0001.md`, …): PDFs with the PDF parser, `.txt` `.md` `.html` `.docx` with the text parser (`ingest/parsers/text_parser.py`, cached in `parsed/text@1/`); `source: document` |
 
 ## Output
 

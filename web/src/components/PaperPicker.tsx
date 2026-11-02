@@ -52,7 +52,7 @@ export function PaperPicker({
           setText(e.target.value);
           setOpen(true);
           setActive(0);
-          if (/^W\d+$/.test(e.target.value.trim())) onChange(e.target.value.trim());
+          if (/^[WD]\d+$/.test(e.target.value.trim())) onChange(e.target.value.trim());
         }}
         onKeyDown={(e) => {
           if (!open || items.length === 0) return;

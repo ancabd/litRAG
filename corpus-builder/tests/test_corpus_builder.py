@@ -239,3 +239,24 @@ def test_retries_after_429(tmp_path):
 def test_max_citing_zero_skips_forward_hop(tmp_path):
     papers, _ = run(tmp_path, ["10.1103/physrevlett.98.146401"], max_citing=0)
     assert set(papers) == {"W1", "W2", "W3"}
+
+
+def test_build_keeps_uploaded_documents_and_reports_progress(tmp_path):
+    cb.add_document(tmp_path, "notes.md", b"# Notes\n\nSome text about thermostats in simulations.\n")
+    seen = []
+    papers, _ = run(tmp_path, ["10.1103/physrevlett.98.146401"], download=False, use_s2=False,
+                    progress=lambda done, total: seen.append((done, total)))
+    rows = cb.load_manifest_rows(tmp_path)
+    ids = [r["openalex_id"] for r in rows]
+    assert "D0001" in ids and set(papers) <= set(ids)
+    assert seen and seen[-1] == (len(papers), len(papers))
+    # the next upload continues the numbering
+    assert cb.add_document(tmp_path, "more.txt", b"More text.")["openalex_id"] == "D0002"
+
+
+def test_build_log_can_be_captured(tmp_path):
+    from logsink import capture
+    lines = []
+    with capture(lines.append):
+        run(tmp_path, ["10.1103/physrevlett.98.146401"], download=False, use_s2=False)
+    assert any("Resolving 1 seed" in line for line in lines)

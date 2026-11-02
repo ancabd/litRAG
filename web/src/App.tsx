@@ -65,7 +65,11 @@ function Shell() {
           <RunPicker />
           {c && c.available && (
             <span className="corpus-stat">
-              {c.status_counts.pdf ?? 0} full texts, {c.status_counts.abstract_only ?? 0} abstracts
+              {[
+                c.status_counts.pdf ? `${c.status_counts.pdf} full texts` : null,
+                c.status_counts.abstract_only ? `${c.status_counts.abstract_only} abstracts` : null,
+                c.status_counts.document ? `${c.status_counts.document} document${c.status_counts.document === 1 ? "" : "s"}` : null,
+              ].filter(Boolean).join(", ") || "Empty corpus"}
             </span>
           )}
         </div>

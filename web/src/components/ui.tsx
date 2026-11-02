@@ -6,6 +6,7 @@ export const STATUS_LABEL: Record<string, string> = {
   abstract_only: "Abstract only",
   metadata_only: "Metadata only",
   not_downloaded: "Not downloaded",
+  document: "Document",
 };
 
 export const TYPE_LABEL: Record<string, string> = {
@@ -16,7 +17,7 @@ export const TYPE_LABEL: Record<string, string> = {
 };
 
 export function StatusPill({ status }: { status: string }) {
-  const tone = status === "pdf" ? "ok" : status === "metadata_only" ? "warn" : "";
+  const tone = status === "pdf" || status === "document" ? "ok" : status === "metadata_only" ? "warn" : "";
   return <span className={`pill ${tone}`}>{STATUS_LABEL[status] ?? status}</span>;
 }
 

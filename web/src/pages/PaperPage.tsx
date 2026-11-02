@@ -1,13 +1,42 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { usePaper, usePaperChunks, useSearch } from "../api/hooks";
+import { useDeleteDocument, usePaper, usePaperChunks, useSearch } from "../api/hooks";
 import { pdfUrl } from "../api/client";
 import { ChunkCard } from "../components/ChunkCard";
 import { ManualAdd } from "../components/ManualAdd";
 import { CopyId, Empty, ErrorBanner, SearchIcon, StatusPill, useDebounced } from "../components/ui";
 import { useRun } from "../run";
 
-const ROLE: Record<string, string> = { seed: "Seed", reference: "Cited by a seed", citing: "Cites a seed" };
+const ROLE: Record<string, string> = {
+  seed: "Seed",
+  reference: "Cited by a seed",
+  citing: "Cites a seed",
+  document: "Uploaded by you",
+};
+
+/** Two clicks, so a stray one doesn't delete a document. */
+function RemoveDocument({ id }: { id: string }) {
+  const remove = useDeleteDocument();
+  const navigate = useNavigate();
+  const [armed, setArmed] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        className={`btn small ${armed ? "danger" : ""}`}
+        disabled={remove.isPending}
+        onBlur={() => setArmed(false)}
+        onClick={() => {
+          if (!armed) return setArmed(true);
+          remove.mutate(id, { onSuccess: (res) => navigate("/papers", { state: { corpusJob: res.job.id } }) });
+        }}
+      >
+        {remove.isPending ? "Removing…" : armed ? "Click again to remove" : "Remove document"}
+      </button>
+      {remove.error && <ErrorBanner error={remove.error} />}
+    </>
+  );
+}
 
 export function PaperPage() {
   const { id } = useParams();
@@ -30,6 +59,7 @@ export function PaperPage() {
   }
   if (!p) return null;
   const shown = query ? within.data?.items : chunks.data?.items;
+  const isDoc = p.status === "document";
 
   return (
     <div className="page">
@@ -57,11 +87,23 @@ export function PaperPage() {
             <CopyId id={p.openalex_id} label="Copy" />
           </span>
         </dd>
-        <dt>Published</dt>
-        <dd>
-          {p.year ?? "Year unknown"}
-          {p.venue && `, ${p.venue}`}
-        </dd>
+        {isDoc ? (
+          <>
+            <dt>File</dt>
+            <dd>
+              {p.source_file}
+              {p.note && <span className="muted xs"> · {p.note}</span>}
+            </dd>
+          </>
+        ) : (
+          <>
+            <dt>Published</dt>
+            <dd>
+              {p.year ?? "Year unknown"}
+              {p.venue && `, ${p.venue}`}
+            </dd>
+          </>
+        )}
         <dt>In the corpus</dt>
         <dd className="row">
           <StatusPill status={p.status} />
@@ -69,7 +111,7 @@ export function PaperPage() {
             <span className="pill accent">{p.added_manually.includes("pdf") ? "PDF added by you" : "abstract added by you"}</span>
           )}
           {p.n_chunks !== undefined && <span className="muted">{p.n_chunks} chunk{p.n_chunks === 1 ? "" : "s"} in {p.run ?? run}</span>}
-          {p.note && p.status !== "pdf" && <span className="muted xs">Download: {p.note}</span>}
+          {p.note && p.status !== "pdf" && !isDoc && <span className="muted xs">Download: {p.note}</span>}
         </dd>
         <dt>Why it's here</dt>
         <dd>
@@ -108,18 +150,24 @@ export function PaperPage() {
               DOI
             </a>
           )}
-          <a className="btn small" href={`https://openalex.org/${p.openalex_id}`} target="_blank" rel="noreferrer">
-            OpenAlex
-          </a>
+          {isDoc ? (
+            <RemoveDocument id={p.openalex_id} />
+          ) : (
+            <a className="btn small" href={`https://openalex.org/${p.openalex_id}`} target="_blank" rel="noreferrer">
+              OpenAlex
+            </a>
+          )}
         </dd>
       </dl>
 
-      <ManualAdd key={p.openalex_id} paper={p} />
+      {!isDoc && <ManualAdd key={p.openalex_id} paper={p} />}
 
-      <section className="section-block">
-        <h2>Abstract</h2>
-        {p.abstract ? <p className="prose">{p.abstract}</p> : <p className="muted">No abstract available.</p>}
-      </section>
+      {!isDoc && (
+        <section className="section-block">
+          <h2>Abstract</h2>
+          {p.abstract ? <p className="prose">{p.abstract}</p> : <p className="muted">No abstract available.</p>}
+        </section>
+      )}
 
       {p.questions.length > 0 && (
         <section className="section-block">
