@@ -37,4 +37,4 @@ data/corpus/
 data/chunks/
 # Cached LLM responses: rebuildable, but each costs money. Remove this line to share the cache.
 data/cache/
-# Kept on purpose: data/questions/ (your eval set) and data/runs/ (the history of your results)
+data/runs/
