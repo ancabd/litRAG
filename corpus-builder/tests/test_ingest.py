@@ -236,3 +236,22 @@ def test_two_column_latex_paper(tmp_path):
     assert "funding agency" not in text                       # acknowledgments removed
     eq = next(s for s in doc.sections if "Equivariant features" in s.title).paragraphs[0].text
     assert eq.startswith("The energy is a sum of atomic contributions, E =") and "(1)" in eq
+
+
+def test_rotated_pages_are_read(tmp_path):
+    """Scans stored sideways with /Rotate 270 (e.g. OCR'd books): text is vertical in the file's own
+    coordinates but horizontal on screen, and must not be dropped as a side stamp."""
+    import pymupdf
+    from ingest.parsers import get_parser
+    doc = pymupdf.open()
+    for i in range(3):
+        page = doc.new_page()
+        page.set_rotation(270)
+        box = pymupdf.Rect(72, 72, page.rect.width - 72, page.rect.height - 72) * page.derotation_matrix
+        page.insert_textbox(box, f"Chapter {i}. A firewall filters packets between networks by their addresses and ports. " * 8,
+                            rotate=270)
+    pdf = tmp_path / "sideways.pdf"
+    doc.save(pdf)
+    assert abs(pymupdf.open(pdf)[0].get_text("dict")["blocks"][0]["lines"][0]["dir"][1]) > 0.9  # vertical in file space
+    parsed = get_parser("pymupdf").parse(pdf, "D1")
+    assert parsed.n_words > 300 and "firewall filters packets" in " ".join(p.text for s in parsed.sections for p in s.paragraphs)

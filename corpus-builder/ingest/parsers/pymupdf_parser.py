@@ -136,12 +136,19 @@ class PyMuPDFParser(Parser):
         flags = pymupdf.TEXT_PRESERVE_WHITESPACE | pymupdf.TEXT_MEDIABOX_CLIP
         for page_no, page in enumerate(pdf, 1):
             height = page.rect.height or 1.0
+            # Pages can be stored sideways with a /Rotate flag (common in scans): text coordinates and
+            # directions come in the unrotated frame, so turn them into the page as it is displayed.
+            # Otherwise every line of a rotated page looks vertical and is dropped below.
+            rot = page.rotation_matrix if page.rotation else None
+            turn = pymupdf.Matrix(rot.a, rot.b, rot.c, rot.d, 0, 0) if rot else None
             for b in page.get_text("dict", flags=flags)["blocks"]:
                 if b.get("type") != 0:
                     continue  # image block
+                bbox = pymupdf.Rect(b["bbox"]) * rot if rot else pymupdf.Rect(b["bbox"])
                 lines, sizes, bold_chars, chars = [], Counter(), 0, 0
                 for line in b["lines"]:
-                    if abs(line["dir"][1]) > 0.1:
+                    direction = pymupdf.Point(line["dir"]) * turn if turn else pymupdf.Point(line["dir"])
+                    if abs(direction.y) > 0.1:
                         continue  # rotated text: arXiv side stamp, axis labels
                     text = "".join(s["text"] for s in line["spans"])
                     if not text.strip():
@@ -161,7 +168,7 @@ class PyMuPDFParser(Parser):
                 text = re.sub(r"[ \t]{2,}", " ", text).strip()
                 if not text:
                     continue
-                blocks.append(_Block(page=page_no, y0=b["bbox"][1], y1=b["bbox"][3], page_height=height,
+                blocks.append(_Block(page=page_no, y0=bbox.y0, y1=bbox.y1, page_height=height,
                                      text=text, size=sizes.most_common(1)[0][0],
                                      bold=bold_chars >= 0.9 * chars, n_lines=len(lines)))
         return blocks
