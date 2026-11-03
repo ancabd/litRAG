@@ -32,7 +32,8 @@ def empty(tmp_path):
     data = tmp_path / "data"
     settings = Settings.from_env(core_dir=SERVER.parent / "corpus-builder", corpus_dir=data / "corpus",
                                  chunks_root=data / "chunks", questions_file=data / "questions" / "questions.yaml",
-                                 runs_dir=data / "runs", cache_dir=data / "cache", web_dist=tmp_path / "no-dist")
+                                 runs_dir=data / "runs", cache_dir=data / "cache", web_dist=tmp_path / "no-dist",
+                                 feedback_file=data / "feedback" / "ratings.jsonl")
     return TestClient(create_app(settings)), data
 
 

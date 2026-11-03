@@ -440,3 +440,45 @@ export interface BuildBody {
   download: boolean;
   openalex_key?: string;
 }
+
+// ------------------------------------------------------------------ your ratings of answers (Ask page)
+
+export type Level = "yes" | "partly" | "no";
+
+export interface Rating {
+  faithful?: Level | null;
+  complete?: Level | null;
+  should_have_answered?: "yes" | "no" | null;
+}
+
+export interface FeedbackRecord {
+  id: string;
+  created: string;
+  updated: string;
+  rating: Rating;
+  comment: string | null;
+  answer: Pick<AskResult, "question" | "answer" | "answerable" | "citations" | "generator" | "retriever" | "run"> & {
+    prompt_version?: string | null;
+    k?: number;
+  };
+}
+
+type LevelCounts = Record<Level, number> & { n: number; score: number | null };
+
+export interface FeedbackSummary {
+  label: string;
+  setup: { method: string; model: string | null; retriever: string; prompt_version: string | null; k: number | null };
+  n: number;
+  answered: number;
+  declined: number;
+  faithful: LevelCounts;
+  complete: LevelCounts;
+  should_have_answered: { yes: number; no: number };
+  last: string | null;
+}
+
+export interface FeedbackList {
+  items: FeedbackRecord[];
+  summary: FeedbackSummary[];
+  file: string;
+}

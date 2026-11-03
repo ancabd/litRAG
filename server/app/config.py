@@ -9,7 +9,7 @@
 These match corpus-builder/paths.py, and the same environment variables override them
 (useful for tests or for keeping data outside the repo):
     LITRAG_DATA (moves all of data/), LITRAG_CORPUS, LITRAG_CHUNKS, LITRAG_QUESTIONS,
-    LITRAG_RUNS, LITRAG_CACHE, plus LITRAG_CORE and LITRAG_WEB_DIST
+    LITRAG_RUNS, LITRAG_CACHE, LITRAG_FEEDBACK, plus LITRAG_CORE and LITRAG_WEB_DIST
 """
 from __future__ import annotations
 
@@ -30,6 +30,7 @@ class Settings:
     runs_dir: Path
     cache_dir: Path
     web_dist: Path
+    feedback_file: Path
 
     @classmethod
     def from_env(cls, **overrides) -> "Settings":
@@ -46,6 +47,7 @@ class Settings:
             "runs_dir": path("LITRAG_RUNS", data / "runs"),
             "cache_dir": path("LITRAG_CACHE", data / "cache"),
             "web_dist": path("LITRAG_WEB_DIST", REPO_ROOT / "web" / "dist"),
+            "feedback_file": path("LITRAG_FEEDBACK", data / "feedback" / "ratings.jsonl"),
         }
         values.update({k: Path(v).resolve() for k, v in overrides.items()})
         return cls(**values)

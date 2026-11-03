@@ -5,6 +5,7 @@ import type { AskResult, TraceStep } from "../api/types";
 import { AnswerText } from "../components/AnswerText";
 import { ChunkCard } from "../components/ChunkCard";
 import { KeyForm } from "../components/KeyForm";
+import { RatingBar } from "../components/RatingBar";
 import { DenseNote, RetrieverSelect } from "../components/RetrieverSelect";
 import { TraceSteps } from "../components/TraceSteps";
 import { ErrorBanner, Seg } from "../components/ui";
@@ -41,12 +42,14 @@ export function AskPage() {
   const [history, setHistory] = useState<AskResult[]>([]);
   const [shown, setShown] = useState<AskResult | null>(null);
   const [asked, setAsked] = useState("");
+  const [askedK, setAskedK] = useState(5); // k of the shown answer, stored with its rating
 
   const usesModel = generator !== "extractive";
   const needsKey = usesModel && llm.data && !llm.data.configured;
   const submit = () => {
     if (question.trim().length < 3 || needsKey) return;
     setAsked(question.trim());
+    setAskedK(k);
     ask.ask({ question: question.trim(), generator, model: usesModel ? model || undefined : undefined, k, retriever }, (r) => {
       setShown(r);
       setHistory((h) => [r, ...h.filter((x) => x.question !== r.question)].slice(0, 12));
@@ -164,6 +167,7 @@ export function AskPage() {
             </ul>
           )}
           <Meta r={r} />
+          <RatingBar result={r} k={askedK} />
           {r.generator.name === "agent" && r.trace && r.trace.length > 0 && (
             <details className="steps" open>
               <summary>How it got there ({r.trace.length} steps)</summary>

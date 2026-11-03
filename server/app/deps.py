@@ -10,6 +10,7 @@ from .services.chunks import ChunkService, RunData
 from .services.corpus import CorpusService, ManualEditor
 from .services.answering import AnsweringService
 from .services.evalruns import EvalRunService
+from .services.feedback import FeedbackStore
 from .services.jobs import JobManager
 from .services.questions import QuestionStore
 
@@ -24,6 +25,7 @@ class Services:
     evals: EvalRunService
     answering: AnsweringService
     jobs: JobManager
+    feedback: FeedbackStore
 
     @classmethod
     def build(cls, settings: Settings) -> "Services":
@@ -31,7 +33,8 @@ class Services:
         return cls(settings, CorpusService(settings.corpus_dir), chunks, QuestionStore(settings.questions_file),
                    ManualEditor(settings.corpus_dir, settings.chunks_root, chunks),
                    EvalRunService(settings.runs_dir, settings.chunks_root, settings.questions_file),
-                   AnsweringService(settings.cache_dir), JobManager())
+                   AnsweringService(settings.cache_dir), JobManager(),
+                   FeedbackStore(settings.feedback_file))
 
 
 def services(request: Request) -> Services:

@@ -3,6 +3,9 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, streamPost } from "./client";
 import type {
+  FeedbackList,
+  FeedbackRecord,
+  Rating,
   BuildBody,
   CorpusJob,
   CorpusOverview,
@@ -426,4 +429,28 @@ export function useDeleteDocument() {
 export function useEverythingChanged() {
   const qc = useQueryClient();
   return useCallback(() => qc.invalidateQueries(), [qc]);
+}
+
+// ------------------------------------------------------------------ your ratings of answers
+
+export const useFeedback = () => useQuery({ queryKey: ["feedback"], queryFn: () => api.get<FeedbackList>("/feedback") });
+
+/** Saves a rating; with `id`, replaces the earlier rating of the same answer. */
+export function useSaveFeedback() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, answer, rating, comment }: { id?: string; answer: unknown; rating: Rating; comment?: string }) =>
+      id
+        ? api.put<FeedbackRecord>(`/feedback/${id}`, { answer, rating, comment })
+        : api.post<FeedbackRecord>("/feedback", { answer, rating, comment }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["feedback"] }),
+  });
+}
+
+export function useDeleteFeedback() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del<{ deleted: string }>(`/feedback/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["feedback"] }),
+  });
 }

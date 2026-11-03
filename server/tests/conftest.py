@@ -86,5 +86,6 @@ def client(data_dir, tmp_path):
                                  chunks_root=data_dir / "chunks",
                                  questions_file=data_dir / "questions" / "questions.yaml",
                                  runs_dir=data_dir / "runs", cache_dir=data_dir / "cache",
+                                 feedback_file=data_dir / "feedback" / "ratings.jsonl",
                                  web_dist=tmp_path / "no-dist")
     return TestClient(create_app(settings))

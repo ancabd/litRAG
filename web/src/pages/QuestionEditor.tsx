@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useBlocker, useNavigate, useParams } from "react-router-dom";
+import { Link, useBlocker, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDeleteQuestion, useMeta, useQuestions, useSaveQuestion } from "../api/hooks";
 import { ApiError } from "../api/client";
@@ -78,11 +78,14 @@ export function QuestionEditor({ isNew = false }: { isNew?: boolean }) {
     return found ? normalize(found) : null;
   }, [isNew, id, list.data]);
 
-  const [form, setForm] = useState<Question | null>(original);
+  // a draft handed over from another page (e.g. "Add as eval question" on Ask); unsaved until you save it
+  const draft = (useLocation().state as { draft?: Partial<Question> } | null)?.draft;
+  const start = () => (isNew && draft ? { ...blank(), ...draft } : original);
+  const [form, setForm] = useState<Question | null>(start);
   const [showFinder, setShowFinder] = useState(false);
   // reset the form when switching questions (not when the list refetches after a save)
   useEffect(() => {
-    setForm(original);
+    setForm(start());
     save.reset();
     setShowFinder(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps

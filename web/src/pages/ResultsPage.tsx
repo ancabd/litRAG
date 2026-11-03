@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDeleteEval, useEvals, useJob, useLlm, useMeta, useQuestions, useStartEval } from "../api/hooks";
 import type { EvalBrief } from "../api/types";
+import { FeedbackPanel } from "../components/FeedbackPanel";
 import { DenseNote, RetrieverSelect, retrieverLabel } from "../components/RetrieverSelect";
 import { Empty, ErrorBanner, Seg } from "../components/ui";
 import { useRun } from "../run";
@@ -315,6 +316,7 @@ export function ResultsPage() {
           <p className="xs muted" style={{ marginTop: 8 }}>Retrieval scores are strict / lenient. A dash means the run has no judge or no reference answers.</p>
         </>
       )}
+      <FeedbackPanel />
     </div>
   );
 }

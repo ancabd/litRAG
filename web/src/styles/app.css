@@ -1836,3 +1836,111 @@ a.tp:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------------------------------------------------------------- rating answers (Ask) */
+.rate {
+  margin: 14px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.rate-head {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.rate-rows {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 32px;
+}
+.rate-title {
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+.rate-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rate-label {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.25;
+}
+.rate-help {
+  font-weight: 400;
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+.rate-choice button[aria-pressed="true"].rate-yes {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.rate-choice button[aria-pressed="true"].rate-partly {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.rate-choice button[aria-pressed="true"].rate-no {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.rate-status {
+  margin-left: auto;
+  color: var(--ink-3);
+}
+.danger-text {
+  color: var(--danger);
+}
+.rate-more {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  align-items: center;
+}
+.rate-more .input {
+  flex: 1;
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .rate-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .rate-more {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ---------------------------------------------------------------- your ratings (Results) */
+.feedback-panel {
+  margin-top: 24px;
+}
+.feedback-panel table td.num .xs {
+  display: block;
+}
+.feedback-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.feedback-list li {
+  position: relative;
+  padding: 8px 80px 8px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.feedback-list li .btn {
+  position: absolute;
+  right: 0;
+  top: 8px;
+}
+.feedback-q {
+  font-weight: 500;
+}
