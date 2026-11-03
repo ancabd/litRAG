@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ApiError } from "../api/client";
+import { ApiError, pdfUrl } from "../api/client";
 
 export const STATUS_LABEL: Record<string, string> = {
   pdf: "Full text",
@@ -127,9 +127,39 @@ export function useDebounced<T>(value: T, ms = 300): T {
   return v;
 }
 
-export function pages(c: { page_start: number | null; page_end: number | null; source?: string }): string {
-  if (c.page_start == null) return ""; // abstracts have no pages; ChunkCard marks them "from abstract"
-  return c.page_end && c.page_end !== c.page_start ? `pp. ${c.page_start}–${c.page_end}` : `p. ${c.page_start}`;
+type Paged = {
+  page_start: number | null;
+  page_end: number | null;
+  page_label_start?: string | null;
+  page_label_end?: string | null;
+  source?: string;
+};
+
+/** "p. 12" or "pp. 12–13", with the page numbers printed in the document when it has its own (books). */
+export function pages(c: Paged): string {
+  if (c.page_start == null) return ""; // abstracts and text documents have no pages
+  const start = c.page_label_start || String(c.page_start);
+  const end = c.page_end != null ? c.page_label_end || String(c.page_end) : start;
+  return c.page_end && c.page_end !== c.page_start ? `pp. ${start}–${end}` : `p. ${start}`;
+}
+
+/** The page reference, linked to the PDF opened at that page. */
+export function PageRef({ chunk, className = "page-ref" }: { chunk: Paged & { paper_id: string }; className?: string }) {
+  const label = pages(chunk);
+  if (!label) return null;
+  const printed = chunk.page_label_start && chunk.page_label_start !== String(chunk.page_start);
+  return (
+    <a
+      className={className}
+      href={`${pdfUrl(chunk.paper_id)}#page=${chunk.page_start}`}
+      target="_blank"
+      rel="noreferrer"
+      title={`Open the PDF at this page${printed ? ` (page ${chunk.page_start} of the PDF file)` : ""}`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {label}
+    </a>
+  );
 }
 
 export function SearchIcon() {

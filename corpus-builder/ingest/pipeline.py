@@ -76,6 +76,25 @@ class PaperReport:
     warnings: list[str] = field(default_factory=list)
 
 
+def page_labels(pdf: Path) -> dict[int, str] | None:
+    """{1-based page: printed page label}, only if the PDF defines labels that differ from 1, 2, 3, ...
+
+    Books and theses often number their pages differently from the PDF (roman numerals for the front
+    matter, then 1 on the tenth sheet). Citations should give the printed number.
+    """
+    try:
+        import pymupdf
+        with pymupdf.open(pdf) as doc:
+            if not doc.get_page_labels():
+                return None
+            labels = {i + 1: page.get_label() for i, page in enumerate(doc)}
+    except Exception:  # noqa: BLE001 - labels are a nicety
+        return None
+    if all(lbl == str(i) for i, lbl in labels.items()):
+        return None
+    return {i: lbl for i, lbl in labels.items() if lbl}
+
+
 def abstract_document(paper_id: str, abstract: str, parser_tag: str = "abstract") -> ParsedDocument:
     return ParsedDocument(paper_id=paper_id, source="abstract", parser=parser_tag, parser_version="1",
                           sections=[Section("Abstract", [Paragraph(abstract.strip())])])
@@ -196,6 +215,12 @@ def run(corpus: Path, out: Path, parser_name: str = "pymupdf", cfg: ChunkConfig 
             meta = {**{k: p.get(k) for k in ("title", "year", "authors", "doi", "venue")},
                     "source_override": source}
             chunks = chunk_document(doc, cfg, meta)
+            path = source_file(p)
+            labels = page_labels(path) if source in ("pdf", "document") and path and path.suffix.lower() == ".pdf" else None
+            if labels:
+                for c in chunks:
+                    c.page_label_start = labels.get(c.page_start) if c.page_start else None
+                    c.page_label_end = labels.get(c.page_end) if c.page_end else None
             for c in chunks:
                 fh.write(json.dumps(c.to_dict(), ensure_ascii=False) + "\n")
             n_chunks += len(chunks)

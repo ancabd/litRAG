@@ -16,6 +16,8 @@ python parse_corpus.py run                    # writes data/chunks/pymupdf_w400_
 | `metadata_only` | nothing (logged as `skipped`) |
 | `document` | an uploaded file (`documents/D0001.md`, …): PDFs with the PDF parser, `.txt` `.md` `.html` `.docx` with the text parser (`ingest/parsers/text_parser.py`, cached in `parsed/text@1/`); `source: document` |
 
+Chunks from PDFs carry `page_start`/`page_end` (1-based position in the file) and, when the PDF defines page labels that differ from 1, 2, 3, … (books), `page_label_start`/`page_label_end` with the printed numbers (`ingest.pipeline.page_labels`). Labels are read at chunking time, so existing runs pick them up on the next `parse_corpus.py run` without re-parsing.
+
 ## Output
 
 ```

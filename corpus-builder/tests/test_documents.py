@@ -84,3 +84,31 @@ def test_documents_are_parsed_cached_and_chunked(tmp_path):
     assert rebuild_runs(corpus, tmp_path / "none") == []
     cb.remove_document(corpus, "D0001")
     assert rebuild_runs(corpus, chunks)[0]["chunks"] == 0
+
+
+def test_printed_page_numbers_from_pdf_labels(tmp_path):
+    """A book whose PDF numbers its front matter i, ii and then 1, 2: chunks carry the printed numbers."""
+    import pymupdf
+    from ingest.pipeline import page_labels
+    doc = pymupdf.open()
+    for i in range(4):
+        page = doc.new_page()
+        page.insert_textbox(pymupdf.Rect(72, 72, 520, 760),
+                            f"Page {i} text about thermostats and barostats in molecular simulation. " * 25)
+    doc.set_page_labels([{"startpage": 0, "prefix": "", "style": "r", "firstpagenum": 1},
+                         {"startpage": 2, "prefix": "", "style": "D", "firstpagenum": 1}])
+    pdf = tmp_path / "book.pdf"
+    doc.save(pdf)
+    assert page_labels(pdf) == {1: "i", 2: "ii", 3: "1", 4: "2"}
+
+    plain = pymupdf.open()
+    plain.new_page()
+    plain.save(tmp_path / "plain.pdf")
+    assert page_labels(tmp_path / "plain.pdf") is None
+
+    corpus, chunks = tmp_path / "corpus", tmp_path / "chunks"
+    cb.add_document(corpus, "book.pdf", pdf.read_bytes(), title="A book")
+    rebuild_runs(corpus, chunks, create_default=True)
+    rows = [json.loads(line) for line in open(chunks / "pymupdf_w400_o60" / "chunks.jsonl")]
+    by_page = {r["page_start"]: r["page_label_start"] for r in rows}
+    assert by_page.get(1) == "i" and by_page.get(3) == "1"

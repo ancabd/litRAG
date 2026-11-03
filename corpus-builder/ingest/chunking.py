@@ -48,6 +48,10 @@ class Chunk:
     authors: str | None = None
     doi: str | None = None
     venue: str | None = None
+    # the page numbers printed on the pages, when the PDF defines them and they differ from the
+    # PDF's own page count (books: "xii", or "143" on PDF page 157); set by ingest.pipeline
+    page_label_start: str | None = None
+    page_label_end: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)

@@ -8,10 +8,13 @@ export function AnswerText({
   text,
   citations,
   anchorPrefix = "p-",
+  describe,
 }: {
   text: string;
   citations: string[];
   anchorPrefix?: string;
+  /** Hover text for a citation, e.g. "Title, p. 143"; defaults to the passage id. */
+  describe?: (id: string) => string | undefined;
 }) {
   const number = new Map(citations.map((c, i) => [c, i + 1]));
   const out: ReactNode[] = [];
@@ -24,7 +27,7 @@ export function AnswerText({
       const n = number.get(id);
       out.push(
         n ? (
-          <a key={`${m.index}-${id}`} href={`#${anchorPrefix}${id}`} className="cite" title={id}>
+          <a key={`${m.index}-${id}`} href={`#${anchorPrefix}${id}`} className="cite" title={describe?.(id) ?? id}>
             {n}
           </a>
         ) : (

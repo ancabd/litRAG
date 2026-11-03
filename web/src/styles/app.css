@@ -1944,3 +1944,16 @@ a.tp:hover {
 .feedback-q {
   font-weight: 500;
 }
+
+/* page reference on a passage: links to the PDF at that page */
+.page-ref {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  font-weight: 500;
+  text-decoration: none;
+  border-bottom: 1px dotted var(--rule-strong);
+}
+.page-ref:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}

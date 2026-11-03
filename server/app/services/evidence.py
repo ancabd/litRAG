@@ -40,7 +40,7 @@ def match_spans(quote: str, text: str, n: int = 3) -> list[tuple[int, int]]:
 
 def chunk_view(c: dict, quote: str | None = None, coverage: float | None = None) -> dict:
     out = {k: c.get(k) for k in ("chunk_id", "paper_id", "section", "page_start", "page_end", "source",
-                                 "n_words", "text")}
+                                 "n_words", "text", "page_label_start", "page_label_end")}
     if quote:
         out["highlights"] = match_spans(quote, c["text"])
     if coverage is not None:

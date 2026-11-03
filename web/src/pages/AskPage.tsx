@@ -8,7 +8,7 @@ import { KeyForm } from "../components/KeyForm";
 import { RatingBar } from "../components/RatingBar";
 import { DenseNote, RetrieverSelect } from "../components/RetrieverSelect";
 import { TraceSteps } from "../components/TraceSteps";
-import { ErrorBanner, Seg } from "../components/ui";
+import { ErrorBanner, pages, Seg } from "../components/ui";
 import { useRun } from "../run";
 
 function Meta({ r }: { r: AskResult }) {
@@ -58,6 +58,10 @@ export function AskPage() {
   const r = shown;
   const cited = r ? r.passages.filter((p) => p.cited_as).sort((a, b) => a.cited_as! - b.cited_as!) : [];
   const others = r ? r.passages.filter((p) => !p.cited_as) : [];
+  const describe = (id: string) => {
+    const p = r?.passages.find((x) => x.chunk_id === id);
+    return p ? [p.title ?? p.paper_id, p.section, pages(p)].filter(Boolean).join(", ") : undefined;
+  };
 
   return (
     <div className="page ask">
@@ -151,12 +155,12 @@ export function AskPage() {
           <p className="answer-q">{r.question}</p>
           {r.answerable ? (
             <div className="prose answer-text">
-              <AnswerText text={r.answer} citations={r.citations} />
+              <AnswerText text={r.answer} citations={r.citations} describe={describe} />
             </div>
           ) : (
             <div className="not-found">
               <strong>Not found in the corpus.</strong>{" "}
-              <span className="prose"><AnswerText text={r.answer} citations={r.citations} /></span>
+              <span className="prose"><AnswerText text={r.answer} citations={r.citations} describe={describe} /></span>
             </div>
           )}
           {r.warnings.length > 0 && (

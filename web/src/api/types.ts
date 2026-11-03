@@ -67,6 +67,8 @@ export interface Chunk {
   section: string;
   page_start: number | null;
   page_end: number | null;
+  page_label_start?: string | null; // printed page number, when the PDF numbers its pages differently (books)
+  page_label_end?: string | null;
   source: string;
   n_words: number;
   text: string;

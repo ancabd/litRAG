@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { Chunk, SearchHit } from "../api/types";
-import { Highlighted, pages } from "./ui";
+import { Highlighted, PageRef } from "./ui";
 
 /** A passage from a paper. `showPaper` adds the paper title (search results). */
 export function ChunkCard({
@@ -35,11 +35,12 @@ export function ChunkCard({
             {hit.title ?? chunk.paper_id}
           </Link>
           <span className="muted small">{hit.year}</span>
+          <PageRef chunk={chunk} />
         </div>
       )}
       <div className="chunk-head">
         <span className="section">{chunk.section}</span>
-        <span className="muted">{pages(chunk)}</span>
+        {!(showPaper && hit) && <PageRef chunk={chunk} />}
         <span className="id">{chunk.chunk_id}</span>
         {chunk.source !== "pdf" && chunk.source !== "document" && <span className="pill">from abstract</span>}
         {chunk.coverage !== undefined && (
