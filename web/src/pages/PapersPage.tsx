@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAddPdf, usePapers, useMeta, type PaperFilters } from "../api/hooks";
+import { useAddPdf, useDeleteDocument, usePapers, useMeta, useRemovePdf, type PaperFilters } from "../api/hooks";
 import {
+  ConfirmButton,
   CopyId,
   ErrorBanner,
   SearchIcon,
@@ -63,6 +64,8 @@ export function PapersPage() {
   const [adding, setAdding] = useState(false);
   // adding PDFs from the list: one hidden file input, aimed at whichever row asked
   const addPdf = useAddPdf();
+  const removePdf = useRemovePdf();
+  const deleteDoc = useDeleteDocument();
   const fileInput = useRef<HTMLInputElement>(null);
   const target = useRef<string | null>(null);
   const [dropRow, setDropRow] = useState<string | null>(null);
@@ -348,6 +351,39 @@ export function PapersPage() {
                       <StatusPill status={p.status} />
                       {p.added_manually.includes("pdf") && (
                         <div className="xs muted row-action">added by you</div>
+                      )}
+                      {p.status === "pdf" && (
+                        <div className="row-action">
+                          <ConfirmButton
+                            label="Remove PDF"
+                            confirm="Click again"
+                            busy={removePdf.isPending && removePdf.variables === p.openalex_id}
+                            disabled={removePdf.isPending}
+                            onConfirm={() =>
+                              removePdf.mutate(p.openalex_id, {
+                                onSuccess: (res) =>
+                                  showToast(res.paper.status === "abstract_only" ? "Removed the PDF; the paper uses its abstract now." : "Removed the PDF; the paper has no abstract, so it's not searchable now."),
+                                onError: (e) => showToast(e.message),
+                              })
+                            }
+                          />
+                        </div>
+                      )}
+                      {p.status === "document" && (
+                        <div className="row-action">
+                          <ConfirmButton
+                            label="Remove"
+                            confirm="Click again"
+                            busy={deleteDoc.isPending && deleteDoc.variables === p.openalex_id}
+                            disabled={deleteDoc.isPending || !!jobId}
+                            onConfirm={() =>
+                              deleteDoc.mutate(p.openalex_id, {
+                                onSuccess: (res) => setJobId(res.job.id),
+                                onError: (e) => showToast(e.message),
+                              })
+                            }
+                          />
+                        </div>
                       )}
                       {p.status !== "pdf" && p.status !== "document" && (
                         <div className="row-action">

@@ -52,6 +52,27 @@ def test_add_pdf_updates_everything_and_survives_rebuild(tmp_path):
     assert (tmp_path / "manual.jsonl").read_text() == ""
 
 
+def test_remove_downloaded_pdf_sticks_across_rebuilds(tmp_path):
+    build_corpus(tmp_path, ["10.1103/physrevlett.98.146401"])
+    assert rows(tmp_path)["W2"]["status"] == "pdf" and "pdf" not in rows(tmp_path)["W2"]["added_manually"]
+
+    row = cb.remove_pdf(tmp_path, "W2")
+    assert row["status"] in ("abstract_only", "metadata_only") and row["pdf_path"] is None
+    assert row["note"] == "PDF removed by you"
+    assert not (tmp_path / "pdfs" / "W2.pdf").exists()
+    assert json.loads((tmp_path / "manual.jsonl").read_text())["pdf_removed"] is True
+
+    # the builder must not download it again
+    _, session = build_corpus(tmp_path, ["10.1103/physrevlett.98.146401"])
+    assert rows(tmp_path)["W2"]["status"] != "pdf" and rows(tmp_path)["W2"]["note"] == "PDF removed by you"
+    assert not (tmp_path / "pdfs" / "W2.pdf").exists()
+
+    # adding your own PDF undoes the removal
+    row = cb.add_manual_pdf(tmp_path, "W2", PDF)
+    assert row["status"] == "pdf" and row["added_manually"] == ["pdf"]
+    assert json.loads((tmp_path / "manual.jsonl").read_text())["pdf_removed"] is False
+
+
 def test_add_abstract_to_metadata_only_paper(tmp_path):
     session_corpus = build_corpus(tmp_path, ["10.1103/physrevlett.98.146401"], use_s2=False)[0]
     assert session_corpus["W3"].status == "metadata_only"
@@ -76,8 +97,8 @@ def test_manual_edit_errors(tmp_path):
         cb.add_manual_pdf(tmp_path, "W2", PDF)
     with pytest.raises(cb.ManualEditError, match="No paper"):
         cb.add_manual_pdf(tmp_path, "W999", PDF)
-    with pytest.raises(cb.ManualEditError, match="no manually added PDF"):
-        cb.remove_manual_pdf(tmp_path, "W2")
+    with pytest.raises(cb.ManualEditError, match="no PDF to remove"):
+        cb.remove_pdf(tmp_path, "W3")
     with pytest.raises(cb.ManualEditError, match="already has an abstract"):
         cb.set_manual_abstract(tmp_path, "W1", "replacement")
     assert (tmp_path / "pdfs" / "W2.pdf").exists()  # the downloaded PDF was never touched

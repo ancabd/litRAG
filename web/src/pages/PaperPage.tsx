@@ -111,7 +111,7 @@ export function PaperPage() {
             <span className="pill accent">{p.added_manually.includes("pdf") ? "PDF added by you" : "abstract added by you"}</span>
           )}
           {p.n_chunks !== undefined && <span className="muted">{p.n_chunks} chunk{p.n_chunks === 1 ? "" : "s"} in {p.run ?? run}</span>}
-          {p.note && p.status !== "pdf" && !isDoc && <span className="muted xs">Download: {p.note}</span>}
+          {p.note && p.status !== "pdf" && !isDoc && <span className="muted xs">{p.note === "PDF removed by you" ? p.note : `Download: ${p.note}`}</span>}
         </dd>
         <dt>Why it's here</dt>
         <dd>

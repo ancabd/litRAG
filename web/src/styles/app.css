@@ -1957,3 +1957,7 @@ a.tp:hover {
   color: var(--accent);
   border-bottom-color: var(--accent);
 }
+.btn.armed {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}

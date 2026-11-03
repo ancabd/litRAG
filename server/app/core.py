@@ -17,6 +17,7 @@ from corpus_builder import (  # noqa: E402
     parse_seed,
     remove_document,
     remove_manual_pdf,
+    remove_pdf,
     set_manual_abstract,
 )
 from evaluation.matching import GoldIndex, ngrams, quote_coverage, words  # noqa: E402
@@ -43,5 +44,5 @@ from retrieval.base import Retriever  # noqa: E402
 
 __all__ = ["DOCUMENT_SUFFIXES", "add_document", "build_corpus", "is_document", "parse_seed", "remove_document", "capture_log", "load_questions_checked", "DEFAULT_K", "DEFAULT_MODEL", "JUDGE_MODEL", "Judge", "LLMError", "LLMNotConfigured", "PRICES", "agreement", "answer_question",
            "available_generators", "get_generator", "make_llm", "paired_compare", "run_answer_eval", "run_eval", "Evidence", "MAX_PDF_BYTES", "ManualEditError", "add_manual_pdf", "paper_report", "rebuild_runs",
-           "remove_manual_pdf", "set_manual_abstract", "FIELDS", "SPLITS", "TYPES", "GoldIndex", "QuestionFileError", "Retriever", "available_retrievers", "is_retriever", "retriever_choices", "RetrieverUnavailable", "dense_retrieval",
+           "remove_manual_pdf", "remove_pdf", "set_manual_abstract", "FIELDS", "SPLITS", "TYPES", "GoldIndex", "QuestionFileError", "Retriever", "available_retrievers", "is_retriever", "retriever_choices", "RetrieverUnavailable", "dense_retrieval",
            "Library", "keys", "get_retriever", "load_chunks", "ngrams", "parse_questions", "quote_coverage", "words"]

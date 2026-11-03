@@ -498,7 +498,7 @@ def _save_manual(out: Path, records: dict[str, dict]) -> None:
     tmp = out / (MANUAL_FILE + ".tmp")
     with open(tmp, "w", encoding="utf-8") as fh:
         for r in sorted(records.values(), key=lambda r: r["openalex_id"]):
-            if r.get("pdf") or r.get("abstract"):
+            if r.get("pdf") or r.get("abstract") or r.get("pdf_removed"):
                 fh.write(json.dumps(r, ensure_ascii=False) + "\n")
     tmp.replace(out / MANUAL_FILE)
 
@@ -524,7 +524,9 @@ def _refresh_row(row: dict, out: Path, manual: dict | None) -> dict:
         row["pdf_path"] = None
         if row.get("status") != "not_downloaded":
             row["status"] = "abstract_only" if row.get("abstract") else "metadata_only"
-        if row.get("note") == "added manually":
+        if manual and manual.get("pdf_removed"):
+            row["note"] = "PDF removed by you"
+        elif row.get("note") == "added manually":
             row["note"] = "manually added PDF removed"
         md.parent.mkdir(exist_ok=True)
         write_abstract_md(paper_from_row(row), md)
@@ -564,18 +566,31 @@ def add_manual_pdf(out: Path, paper_id: str, data: bytes) -> dict:
         tmp.write_bytes(data)
         tmp.replace(pdfs / f"{paper_id}.pdf")
         record["pdf"] = True
+        record["pdf_removed"] = False
 
     return _edit_paper(out, paper_id, change)
 
 
-def remove_manual_pdf(out: Path, paper_id: str) -> dict:
+def remove_pdf(out: Path, paper_id: str) -> dict:
+    """Delete a paper's PDF, whether you added it or it was downloaded; the paper goes back to its abstract.
+
+    A downloaded PDF you remove (the wrong paper, a bad scan) is recorded in manual.jsonl, so the
+    corpus builder doesn't download it again. Adding a PDF by hand later undoes that.
+    """
     def change(row, record):
-        if not record.get("pdf"):
-            raise ManualEditError(f"{paper_id} has no manually added PDF to remove.")
-        (Path(out) / "pdfs" / f"{paper_id}.pdf").unlink(missing_ok=True)
-        record["pdf"] = False
+        pdf = Path(out) / "pdfs" / f"{paper_id}.pdf"
+        if not pdf.exists():
+            raise ManualEditError(f"{paper_id} has no PDF to remove.")
+        pdf.unlink()
+        if record.get("pdf"):
+            record["pdf"] = False          # one you added: back to how it was before
+        else:
+            record["pdf_removed"] = True   # a downloaded one: don't fetch it again
 
     return _edit_paper(out, paper_id, change)
+
+
+remove_manual_pdf = remove_pdf  # the earlier name
 
 
 def set_manual_abstract(out: Path, paper_id: str, abstract: str | None) -> dict:
@@ -743,6 +758,11 @@ def build(seed_lines: list[str], out: Path, *, api_key: str | None = None, max_c
             else:
                 p.note = "already downloaded"
             stale_abstract.unlink(missing_ok=True)
+            continue
+        if (manual.get(p.openalex_id) or {}).get("pdf_removed"):
+            p.status = "abstract_only" if p.abstract else "metadata_only"
+            p.note = "PDF removed by you"
+            write_abstract_md(p, out / "abstracts" / f"{p.openalex_id}.md")
             continue
         if download:
             url, err = download_pdf(session, throttle, p.pdf_candidates, pdf)

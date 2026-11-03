@@ -60,3 +60,16 @@ def test_manual_errors(client):
     assert client.delete("/api/papers/W2/pdf").status_code == 400
     r = client.put("/api/papers/W2/abstract", json={"abstract": "replace it"})
     assert r.status_code == 400 and "already has an abstract" in r.json()["detail"]
+
+
+def test_remove_downloaded_pdf(client, data_dir):
+    assert client.get("/api/papers/W1").json()["status"] == "pdf"
+    r = client.delete("/api/papers/W1/pdf")
+    assert r.status_code == 200, r.text
+    p = r.json()["paper"]
+    assert p["status"] == "abstract_only" and not p["pdf_available"] and p["note"] == "PDF removed by you"
+    assert not (data_dir / "corpus" / "pdfs" / "W1.pdf").exists()
+    assert r.json()["ingest"][0]["source"] == "abstract"
+    assert json.loads((data_dir / "corpus" / "manual.jsonl").read_text())["pdf_removed"] is True
+    assert client.get("/api/papers/W1/pdf").status_code == 404
+    assert client.delete("/api/papers/W1/pdf").status_code == 400  # nothing left to remove

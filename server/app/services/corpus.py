@@ -196,8 +196,8 @@ class ManualEditor:
         return self._apply(lambda: add_manual_pdf(self.corpus_dir, paper_id, data), paper_id)
 
     def remove_pdf(self, paper_id: str) -> dict:
-        from ..core import remove_manual_pdf
-        return self._apply(lambda: remove_manual_pdf(self.corpus_dir, paper_id), paper_id)
+        from ..core import remove_pdf
+        return self._apply(lambda: remove_pdf(self.corpus_dir, paper_id), paper_id)
 
     def set_abstract(self, paper_id: str, abstract: str | None) -> dict:
         from ..core import set_manual_abstract

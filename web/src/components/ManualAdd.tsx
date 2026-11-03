@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAddPdf, useRemovePdf, useSetAbstract } from "../api/hooks";
 import type { IngestResult, PaperDetail } from "../api/types";
-import { ErrorBanner } from "./ui";
+import { ConfirmButton, ErrorBanner } from "./ui";
 
 /** Plain-language outcome of re-chunking, per chunk run. */
 export function IngestSummary({ results }: { results: IngestResult[] }) {
@@ -99,7 +99,35 @@ export function ManualAdd({ paper }: { paper: PaperDetail }) {
   const last = add.data ?? remove.data ?? setAbstract.data;
   const error = add.error ?? remove.error ?? setAbstract.error;
 
-  if (paper.status === "pdf" && !manualPdf && !last) return null;
+  if (paper.status === "pdf" && !manualPdf) {
+    return (
+      <section className="section-block manual">
+        <h2>Downloaded full text</h2>
+        <div className="row" style={{ marginTop: 8 }}>
+          <span className="small" style={{ color: "var(--ink-2)", maxWidth: "70ch" }}>
+            The corpus builder downloaded this PDF. If it's the wrong paper or a bad scan, remove it: the file is deleted,
+            the paper goes back to its abstract, and the corpus builder won't download it again. You can still add your
+            own PDF afterwards.
+            {paper.questions.length > 0 && (
+              <strong>
+                {" "}
+                {paper.questions.length} eval question{paper.questions.length === 1 ? " uses" : "s use"} it as evidence;
+                their quotes will only be found if they're in the abstract.
+              </strong>
+            )}
+          </span>
+          <ConfirmButton
+            label="Remove PDF"
+            confirm="Click again to delete the PDF"
+            busy={remove.isPending}
+            disabled={busy}
+            onConfirm={() => remove.mutate(paper.openalex_id)}
+          />
+        </div>
+        {error && <ErrorBanner error={error} />}
+      </section>
+    );
+  }
 
   return (
     <section className="section-block manual">
@@ -108,7 +136,9 @@ export function ManualAdd({ paper }: { paper: PaperDetail }) {
       {!manualPdf && (
         <>
           <p className="small" style={{ color: "var(--ink-2)", maxWidth: "70ch", margin: "6px 0 10px" }}>
-            No free full text was found for this paper. If you have the PDF, for example through your library, add it
+            {paper.note === "PDF removed by you"
+              ? `You removed the downloaded PDF, so ${paper.abstract ? "this paper uses its abstract" : "this paper has no text to search"}. To use a better copy,`
+              : "No free full text was found for this paper. If you have the PDF,"} for example through your library, add it
             here. It's saved to <code className="code">corpus/pdfs/{paper.openalex_id}.pdf</code>, recorded in the
             manifest (and kept when the corpus builder runs again), and parsed into every chunk run.
           </p>
@@ -123,16 +153,13 @@ export function ManualAdd({ paper }: { paper: PaperDetail }) {
           <span className="small" style={{ color: "var(--ink-2)" }}>
             You added this paper's PDF by hand. Removing it deletes the file and goes back to the abstract.
           </span>
-          <button
-            type="button"
-            className="btn small danger"
+          <ConfirmButton
+            label="Remove PDF"
+            confirm="Click again to delete the PDF"
+            busy={remove.isPending}
             disabled={busy}
-            onClick={() => {
-              if (window.confirm("Remove the PDF you added? The file is deleted from corpus/pdfs.")) remove.mutate(paper.openalex_id);
-            }}
-          >
-            {remove.isPending ? "Removing…" : "Remove PDF"}
-          </button>
+            onConfirm={() => remove.mutate(paper.openalex_id)}
+          />
         </div>
       )}
 

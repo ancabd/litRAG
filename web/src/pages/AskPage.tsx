@@ -37,12 +37,12 @@ export function AskPage() {
   const [question, setQuestion] = useState("");
   const [generator, setGenerator] = useState<"claude" | "agent" | "extractive">("claude");
   const [model, setModel] = useState("");
-  const [k, setK] = useState(5);
-  const [retriever, setRetriever] = useState("bm25");
+  const [k, setK] = useState(8);
+  const [retriever, setRetriever] = useState("hybrid:bge-small");
   const [history, setHistory] = useState<AskResult[]>([]);
   const [shown, setShown] = useState<AskResult | null>(null);
   const [asked, setAsked] = useState("");
-  const [askedK, setAskedK] = useState(5); // k of the shown answer, stored with its rating
+  const [askedK, setAskedK] = useState(8); // k of the shown answer, stored with its rating
 
   const usesModel = generator !== "extractive";
   const needsKey = usesModel && llm.data && !llm.data.configured;

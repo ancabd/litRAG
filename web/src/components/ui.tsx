@@ -143,6 +143,48 @@ export function pages(c: Paged): string {
   return c.page_end && c.page_end !== c.page_start ? `pp. ${start}–${end}` : `p. ${start}`;
 }
 
+/** A destructive button that asks for a second click instead of a dialog. */
+export function ConfirmButton({
+  label,
+  confirm = "Click again to confirm",
+  busy,
+  busyLabel = "Removing…",
+  disabled,
+  onConfirm,
+  className = "btn small",
+}: {
+  label: string;
+  confirm?: string;
+  busy?: boolean;
+  busyLabel?: string;
+  disabled?: boolean;
+  onConfirm: () => void;
+  className?: string;
+}) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+  return (
+    <button
+      type="button"
+      className={`${className} ${armed ? "danger armed" : ""}`}
+      disabled={disabled || busy}
+      onBlur={() => setArmed(false)}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!armed) return setArmed(true);
+        setArmed(false);
+        onConfirm();
+      }}
+    >
+      {busy ? busyLabel : armed ? confirm : label}
+    </button>
+  );
+}
+
 /** The page reference, linked to the PDF opened at that page. */
 export function PageRef({ chunk, className = "page-ref" }: { chunk: Paged & { paper_id: string }; className?: string }) {
   const label = pages(chunk);
