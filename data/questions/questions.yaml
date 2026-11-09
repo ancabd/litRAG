@@ -360,36 +360,6 @@
     quote: This is most likely due to the decomposition of the energy into atomic contributions which is not appropriate
       for these properties.
 
-- id: q019
-  question: What problem with CHARMM36 was CHARMM36m designed to fix?
-  type: lookup
-  tags:
-  - force-fields
-  - charmm
-  split: dev
-  answer: CHARMM36 overstabilized compact and left-handed helical structures in intrinsically disordered proteins
-    and peptides. CHARMM36m was refined to describe disordered proteins better while keeping the accuracy of CHARMM36
-    for folded proteins.
-  evidence:
-  - paper: W2555870966
-  notes: 'TODO: answer written from memory; check it against the paper. Find the id with: grep -i charmm36m corpus/manifest.csv,
-    then add a quote.'
-
-- id: q020
-  question: Which parts of the force field were changed to go from CHARMM36 to CHARMM36m?
-  type: lookup
-  tags:
-  - force-fields
-  - charmm
-  split: dev
-  answer: Mainly the backbone CMAP correction was refit, to reduce the left-handed helix bias, and the paper recommends
-    a modified TIP3P water with a stronger Lennard-Jones interaction on the water hydrogens, so that disordered
-    proteins are less overly compact.
-  evidence:
-  - paper: W2555870966
-  notes: 'TODO: answer written from memory, and the least certain of these. Check it, and correct the answer if
-    the paper says otherwise.'
-
 - id: q021
   question: What experimental success rate does RFdiffusion reach when designing protein binders?
   type: unanswerable
@@ -582,3 +552,361 @@
     to the supplementary information for the diamond training curve; no total training cost is stated.
   notes: 'A near-miss on purpose: nearby passages discuss speed-ups and time per update, which a weak system may
     turn into a made-up total. If you later add the supplementary information to the corpus, check this again.'
+    
+# New questions q034-q045 on AlphaFold 2 (Jumper et al. 2021, W3177828909), to paste at the end of
+# questions/questions.yaml. If your file already uses some of these ids, renumber them.
+
+- id: q034
+  question: How close to the experimental structures were AlphaFold's backbone predictions at CASP14, and how did the runner-up do?
+  type: lookup
+  tags: [numeric, alphafold]
+  split: dev
+  answer: >-
+    Median backbone accuracy of 0.96 Å r.m.s.d.95 (Cα r.m.s.d. at 95% residue coverage; 95% CI 0.85-1.16 Å),
+    against 2.8 Å for the next best method. For scale, a carbon atom is about 1.4 Å wide.
+  evidence:
+    - paper: W3177828909
+      quote: "AlphaFold structures had a median backbone accuracy of 0.96 Å r.m.s.d.95 (Cα root-mean-square deviation at 95% residue coverage)"
+
+- id: q035
+  question: What are the two main stages of the AlphaFold network, and what does each one produce?
+  type: lookup
+  tags: [definition, alphafold]
+  split: dev
+  answer: >-
+    First a trunk of repeated Evoformer blocks (48) turns the inputs into an Nseq × Nres MSA representation and an
+    Nres × Nres pair representation. Then the structure module (8 blocks, shared weights) builds an explicit 3D
+    structure as a rotation and translation for each residue, starting from all residues at the origin with
+    identity rotations.
+  evidence:
+    - paper: W3177828909
+      quote: "First, the trunk of the network processes the inputs through repeated layers of a novel neural network block that we term Evoformer"
+    - paper: W3177828909
+      quote: "The trunk of the network is followed by the structure module that introduces an explicit 3D structure in the form of a rotation and translation for each residue of the protein"
+
+- id: q036
+  question: Why are AlphaFold's pair-representation updates organised around triangles of residues?
+  type: lookup
+  tags: [alphafold]
+  split: dev
+  answer: >-
+    For pairwise information to correspond to a single 3D structure it must be consistent, e.g. distances must
+    satisfy the triangle inequality. So each update of an edge ij uses the other two edges of triangles ijk: triangle
+    self-attention with an extra bias for the missing edge, and the triangle multiplicative update. Either alone
+    gives accurate structures, but combining both is more accurate.
+  evidence:
+    - paper: W3177828909
+      quote: "many constraints must be satisfied including the triangle inequality on distances. On the basis of this intuition, we arrange the update operations on the pair representation in terms of triangles of edges involving three different nodes"
+
+- id: q037
+  question: Does AlphaFold's structure module keep the peptide bonds intact while it builds the structure? How is the geometry fixed at the end?
+  type: lookup
+  tags: [alphafold, force-fields]
+  split: dev
+  answer: >-
+    No. Each residue is a free-floating rigid body ("residue gas"), and the network often breaks the chain, which
+    lets it refine all parts locally without solving loop closure. A violation loss encourages correct peptide
+    geometry during fine-tuning, but it is only enforced exactly by a final relaxation by gradient descent in the
+    Amber force field (Amber99sb in OpenMM), which removes stereochemical violations without improving accuracy.
+  evidence:
+    - paper: W3177828909
+      quote: "the peptide bond geometry is completely unconstrained and the network is observed to frequently violate the chain constraint during the application of the structure module"
+    - paper: W3177828909
+      quote: "Exact enforcement of peptide bond geometry is only achieved in the post-prediction relaxation of the structure by gradient descent in the Amber32 force field."
+
+- id: q038
+  question: What loss is AlphaFold mainly trained with, and what does it compare?
+  type: lookup
+  tags: [definition, alphafold]
+  split: dev
+  answer: >-
+    The frame-aligned point error (FAPE). For each residue's frame, the predicted structure is aligned to the true
+    one on that frame and the distances between predicted and true atom positions are computed; the
+    Nframes × Natoms distances are penalised with a clamped L1 loss. This makes atoms correct relative to each
+    residue's local frame and is the main source of chirality.
+  evidence:
+    - paper: W3177828909
+      quote: "The final loss (which we term the frame-aligned point error (FAPE) (Fig. 3f)) compares the predicted atom positions to the true positions under many different alignments."
+
+- id: q039
+  question: How did AlphaFold make use of protein sequences that have no known structure?
+  type: lookup
+  tags: [alphafold]
+  split: dev
+  answer: >-
+    Self-distillation, similar to noisy student: a trained network predicted structures for about 350,000
+    Uniclust30 sequences (355,993 in the Methods), kept a high-confidence subset, and a new model was trained from
+    scratch on a mix of PDB data and these predictions (75% predictions, 25% PDB). A BERT-style masked-MSA objective
+    also uses unlabelled information, trained jointly rather than pre-trained.
+  evidence:
+    - paper: W3177828909
+      quote: "we use a trained network to predict the structure of around 350,000 diverse sequences from Uniclust3036 and make a new dataset of predicted structures filtered to a high-confidence subset"
+  notes: Two numbers in the paper (around 350,000 in the main text, 355,993 in the Methods); accept either.
+
+- id: q040
+  question: Below what alignment depth does AlphaFold's accuracy drop off, and what other kind of protein does it struggle with?
+  type: lookup
+  tags: [numeric, alphafold]
+  split: dev
+  answer: >-
+    Accuracy falls substantially when the median MSA depth is below about 30 sequences; above about 100 the gains
+    are small. It is also much weaker for proteins with few intra-chain or homotypic contacts compared with
+    heterotypic ones, such as bridging domains whose shape comes from other chains in a complex.
+  evidence:
+    - paper: W3177828909
+      quote: "the accuracy decreases substantially when the median alignment depth is less than around 30 sequences"
+    - paper: W3177828909
+      quote: "AlphaFold is much weaker for proteins that have few intra-chain or homotypic contacts compared to the number of heterotypic contacts"
+
+- id: q041
+  question: How long does a single AlphaFold model take for a 384-residue protein on a V100, with and without ensembling?
+  type: lookup
+  tags: [numeric, alphafold]
+  split: dev
+  answer: >-
+    9.2 minutes with ensembling (the CASP14 configuration) and 1.1 minutes without; turning ensembling off makes the
+    network about 8× faster at very similar accuracy.
+  evidence:
+    - paper: W3177828909
+      quote: "Representative timings for the neural network using a single model on V100 GPU are 4.8 min with 256 residues, 9.2 min with 384 residues and 18 h at 2,500 residues."
+    - paper: W3177828909
+      quote: "Without ensembling, the network is 8× faster and the representative timings for a single model are 0.6 min with 256 residues, 1.1 min with 384 residues and 2.1 h with 2,500 residues."
+
+- id: q042
+  question: Which ablation shows AlphaFold needs metagenomic sequence databases, and how big was the effect?
+  type: lookup
+  tags: [numeric, alphafold]
+  split: dev
+  answer: >-
+    Re-running CASP14 with different MSA sources: removing BFD cost 0.4 GDT, removing MGnify 0.7 GDT, and removing
+    both 6.1 GDT. Most targets barely changed, but a few outliers changed by 20+ GDT; at least one metagenomic
+    database matters for targets poorly covered by UniRef.
+  evidence:
+    - paper: W3177828909
+      quote: "Removing BFD reduced the mean accuracy by 0.4 GDT, removing Mgnify reduced the mean accuracy by 0.7 GDT, and removing both reduced the mean accuracy by 6.1 GDT."
+
+- id: q043
+  question: AlphaFold's invariant point attention and NequIP both have to deal with rotations of the whole system. Which quantities does each keep invariant, and which equivariant?
+  type: comparison
+  tags: [alphafold, nequip]
+  split: dev
+  answer: >-
+    In AlphaFold's IPA, query, key and value points are produced in each residue's local frame, so the attention
+    output is invariant to global rotations and translations; the frame updates are then applied in each local
+    frame, which makes the block as a whole equivariant on the residue gas. NequIP keeps its internal features
+    equivariant (geometric tensors under rotation and reflection) throughout message passing, and only its output,
+    the potential energy, is invariant.
+  evidence:
+    - paper: W3177828909
+      quote: "The IPA augments each of the usual attention queries, keys and values with 3D points that are produced in the local frame of each residue such that the final value is invariant to global rotations and translations"
+    - paper: W4225405705
+      quote: "ven though the output of NequIP is the predicted potential energy Epot, which is invariant under translations, reflection, and rotations, the network contains internal features that are geometric tensors which are equivariant to rotation and reflection. This constitutes the core difference between NequIP and existing scalar-valued invariant GNN-IPs."
+
+- id: q044
+  question: AlphaFold and DiffTRe both face a shortage of labelled training data. What does each use to get around it?
+  type: comparison
+  tags: [alphafold, difftre]
+  split: dev
+  answer: >-
+    AlphaFold adds unlabelled sequences through self-distillation: its own high-confidence predicted structures for
+    about 350,000 Uniclust30 sequences become extra training data. DiffTRe sees the limit of bottom-up training as
+    the lack of precise and broad enough quantum data sets, and instead trains top-down on experimental
+    observables through reweighted simulations.
+  evidence:
+    - paper: W3177828909
+      quote: "we use a trained network to predict the structure of around 350,000 diverse sequences from Uniclust3036 and make a new dataset of predicted structures filtered to a high-confidence subset"
+    - paper: W3168247670
+      quote: "Thus, the main obstacle in bottom-up learning of NN potentials is currently limited availability of highly precise and sufficiently broad data sets."
+
+- id: q045
+  question: What learning rate and optimizer were used to train AlphaFold?
+  type: unanswerable
+  tags: [alphafold]
+  split: dev
+  answer: >-
+    Not answerable from this corpus: the paper only says fine-tuning used a reduced learning rate and refers to
+    Supplementary Methods 1.11 for the exact configuration, which is not part of the PDF.
+  notes: Tempting to answer from memory (Adam, 1e-3); a correct system declines.
+  
+  
+# New questions q046-q058 on ESM-2 / ESMFold (Lin et al., "Evolutionary-scale prediction of atomic
+# level protein structure with a language model", W4327550249), to paste at the end of
+# questions/questions.yaml after the AlphaFold batch (q034-q045). Renumber if the ids are taken.
+
+- id: q046
+  question: What does ESMFold use instead of a multiple sequence alignment, and what does that save at prediction time?
+  type: lookup
+  tags: [definition, esmfold]
+  split: dev
+  answer: >-
+    The internal representations of the ESM-2 protein language model, computed from the single input sequence.
+    No external evolutionary databases, MSAs or templates are needed, which removes the search for related
+    sequences (over 10 minutes with AlphaFold's and RosettaFold's high-sensitivity pipelines) and simplifies the
+    network.
+  evidence:
+    - paper: W4327550249
+      quote: "This removes costly aspects of current state-of-the-art structure prediction pipelines, eliminating the need for a multiple sequence alignment, while at the same time greatly simplifying the neural architecture used for inference."
+
+- id: q047
+  question: What data was ESM-2 trained on, and how many distinct sequences does it see during training?
+  type: lookup
+  tags: [numeric, esmfold]
+  split: dev
+  answer: >-
+    UniRef sequences, with masked language modelling: sampled evenly across ~43 million UniRef50 clusters drawn
+    from ~138 million UniRef90 sequences, so the model sees ~65 million unique sequences over training.
+  evidence:
+    - paper: W4327550249
+      quote: "During training sequences are sampled with even weighting across ∼43 million UniRef50 training clusters from ∼138 million UniRef90 sequences so that over the course of training the model sees ∼65 million unique sequences."
+
+- id: q048
+  question: What does perplexity mean for a protein language model, and how much did it improve from the smallest to the largest ESM-2?
+  type: lookup
+  tags: [numeric, definition, esmfold]
+  split: dev
+  answer: >-
+    Roughly the number of amino acids the model is choosing between at each prediction: 1 for a perfect model, 20
+    for random guessing. At 270K training steps the 8M-parameter model has a perplexity of 10.45 and the 15B model
+    6.37.
+  evidence:
+    - paper: W4327550249
+      quote: "This fidelity can be measured using perplexity, which ranges from 1 for a perfect model to 20 for a model that makes predictions at random."
+    - paper: W4327550249
+      quote: "At 270K training steps the 8M parameter model has a perplexity of 10.45, and the 15B model reaches a perplexity of 6.37"
+
+- id: q049
+  question: How accurate is ESMFold compared with AlphaFold2 and RoseTTAFold on CAMEO and CASP14?
+  type: lookup
+  tags: [numeric, esmfold]
+  split: dev
+  answer: >-
+    Average TM-score 0.83 on CAMEO and 0.68 on CASP14, against 0.88 and 0.85 for AlphaFold2 with MSAs and
+    templates. RoseTTAFold averages 0.82 on CAMEO, so ESMFold is competitive with it there. With the MSA removed,
+    AlphaFold and RoseTTAFold fall well below ESMFold.
+  evidence:
+    - paper: W4327550249
+      quote: "ESMFold achieves an average TM-score of 0.83 on CAMEO and 0.68 on CASP14. Using the search protocols released with AlphaFold2, including MSAs and templates, AlphaFold2 achieves 0.88 and 0.85 on CAMEO and CASP14 respectively."
+
+- id: q050
+  question: Which part of ESMFold matters most according to its ablations?
+  type: lookup
+  tags: [numeric, esmfold]
+  split: dev
+  answer: >-
+    The language model. Against a smaller 8-block baseline at 0.74 LDDT on CAMEO, removing the language model
+    drops single-sequence performance to 0.58 LDDT, and removing the folding trunk drops it to 0.66. Other
+    ablations (one structure-module block, no recycling, no AlphaFold2 distillation targets, no triangular updates)
+    cost only 0.01-0.04 LDDT.
+  evidence:
+    - paper: W4327550249
+      quote: "Without the language model, the single sequence performance on the CAMEO test set degrades substantially, to 0.58 LDDT."
+
+- id: q051
+  question: Which ESM-2 model does ESMFold use, and is it fine-tuned along with the folding head?
+  type: lookup
+  tags: [esmfold]
+  split: dev
+  answer: >-
+    The 3B-parameter ESM-2, the largest that allows inference on a single GPU, and its parameters are frozen
+    while ESMFold is trained.
+  evidence:
+    - paper: W4327550249
+      quote: "Language model parameters are frozen for training ESMFold. We use the 3B parameter language model, the largest model that permits inference on a single GPU."
+
+- id: q052
+  question: Why does ESM-2 use rotary position embeddings instead of the learned absolute positions of ESM-1b?
+  type: lookup
+  tags: [definition, esmfold]
+  split: dev
+  answer: >-
+    Absolute position encodings (sinusoidal or learned) don't extrapolate beyond the context window seen in
+    training; RoPE lets the model extrapolate. It costs a little extra computation and improved small models, but
+    the gains faded as model size and training duration grew.
+  evidence:
+    - paper: W4327550249
+      quote: "In ESM-2, we used Rotary Position Embedding (RoPE) (66) to allow the model extrapolate beyond the context window it is trained on."
+
+- id: q053
+  question: How big is the ESM Metagenomic Atlas, and how long did it take to compute?
+  type: lookup
+  tags: [numeric, esmfold]
+  split: dev
+  answer: >-
+    Over 617 million MGnify90 proteins (all sequences of length 20-1024, 99% of the database), folded in 2 weeks on
+    about 2,000 GPUs. About 225 million predictions are high confidence (mean pLDDT > 0.7 and pTM > 0.7) and about
+    365 million have good confidence (> 0.5).
+  evidence:
+    - paper: W4327550249
+      quote: "We were able to complete the predictions in 2 weeks on a cluster of approximately 2,000 GPUs"
+    - paper: W4327550249
+      quote: "∼225 million predictions with high confidence (mean pLDDT > 0.7 and pTM > 0.7)"
+
+- id: q054
+  question: How many of the high-confidence metagenomic structures have no similar experimentally determined structure?
+  type: lookup
+  tags: [numeric, esmfold]
+  split: dev
+  answer: >-
+    In a random sample of 1 million high-confidence structures, 12.6% (125,765) have no PDB structure with TM-score
+    over 0.5; at a 0.7 threshold it is 25.4%. 10.4% have both low structural similarity and no close sequence
+    homolog.
+  evidence:
+    - paper: W4327550249
+      quote: "For 12.6% of the structures (125,765 proteins), no structure is found with TM-score over 0.5 in the PDB database"
+
+- id: q055
+  question: For a 384-residue protein on a V100, how does ESMFold's prediction time compare with AlphaFold's own timings?
+  type: comparison
+  tags: [numeric, esmfold, alphafold]
+  split: dev
+  answer: >-
+    ESMFold takes 14.2 seconds, which the ESM paper calls 6× faster than a single AlphaFold2 model. The AlphaFold
+    paper reports 9.2 minutes with ensembling and 1.1 minutes without, and ESMFold also skips the MSA search, which
+    can take over 10 minutes on its own.
+  evidence:
+    - paper: W4327550249
+      quote: "On a single NVIDIA V100 GPU, ESMFold makes a prediction on a protein with 384 residues in 14.2 seconds, 6x faster than a single AlphaFold2 model."
+    - paper: W3177828909
+      quote: "Without ensembling, the network is 8× faster and the representative timings for a single model are 0.6 min with 256 residues, 1.1 min with 384 residues and 2.1 h with 2,500 residues."
+  notes: 1.1 min / 14.2 s is closer to 4.6× than 6×; the papers' numbers come from different setups. A good answer reports both rather than reconciling them.
+
+- id: q056
+  question: ESMFold's folding block is adapted from an AlphaFold block. Which one, and what had to change because there is no MSA?
+  type: multihop
+  tags: [esmfold, alphafold]
+  split: dev
+  answer: >-
+    The Evoformer. AlphaFold's Evoformer keeps a 2D MSA representation (axial attention over its rows and columns)
+    and updates the pair representation from it through an outer product summed over the sequences. ESMFold's
+    language-model features are one-dimensional, so axial attention becomes standard self-attention over the
+    sequence (still biased by the pair representation), sequence and pair communicate through an outer product and
+    an outer difference, and templates are replaced by the language model's attention maps.
+  evidence:
+    - paper: W4327550249
+      quote: "Since MSAs are two dimensional, the Evoformer employs axial attention (69) over the columns and rows of the MSA. The language model features are one dimensional, so we can replace the axial attention with a standard attention over this feature space."
+    - paper: W3177828909
+      quote: "The MSA representation updates the pair representation through an element-wise outer product that is summed over the MSA sequence dimension."
+
+- id: q057
+  question: Both AlphaFold and ESMFold add predicted structures to their training data. How does each do it?
+  type: comparison
+  tags: [esmfold, alphafold]
+  split: dev
+  answer: >-
+    AlphaFold self-distils: its own model predicts ~350,000 Uniclust30 sequences, a high-confidence subset is kept,
+    and the final model samples 75% from these predictions and 25% from the PDB. ESMFold distils from AlphaFold2
+    instead: ~13.5M AlphaFold2 predictions filtered to mean pLDDT > 70 (removing only 1.5%), no loss on residues
+    with pLDDT < 70, also sampled 75% of the time against 25% real structures.
+  evidence:
+    - paper: W3177828909
+      quote: "we use a trained network to predict the structure of around 350,000 diverse sequences from Uniclust3036 and make a new dataset of predicted structures filtered to a high-confidence subset"
+    - paper: W4327550249
+      quote: "Predicted structures are sampled from 75% of the time, and real structures 25% of the time during training."
+
+- id: q058
+  question: What TM-score does ESMFold reach on the CASP15 targets?
+  type: unanswerable
+  tags: [esmfold]
+  split: dev
+  answer: Not answerable from this corpus; the ESMFold paper evaluates on CASP14 and CAMEO, not CASP15.
+  notes: Near miss on purpose; a system that grabs the CASP14 number (0.68) is wrong.
